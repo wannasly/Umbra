@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+env:
+  SING_BOX_VERSION: "1.13.14"
+  SING_BOX_ARCHIVE_SHA256: "f580782c6dd10f7691c66cea1d7c421813c5fbf7e305d1ee7ce0c3a40d196341"
+
 jobs:
   check:
     runs-on: windows-latest
@@ -30,6 +34,22 @@ jobs:
           workspaces: src-tauri -> target
 
       - run: npm ci
+
+      - name: Download verified sing-box core
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "sing-box.zip"
+          $url = "https://github.com/SagerNet/sing-box/releases/download/v$env:SING_BOX_VERSION/sing-box-$env:SING_BOX_VERSION-windows-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:SING_BOX_ARCHIVE_SHA256) {
+            throw "sing-box archive checksum mismatch: $actual"
+          }
+          $expanded = Join-Path $env:RUNNER_TEMP "sing-box"
+          Expand-Archive -LiteralPath $archive -DestinationPath $expanded
+          New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
+          Copy-Item -LiteralPath "$expanded/sing-box-$env:SING_BOX_VERSION-windows-amd64/sing-box.exe" -Destination "src-tauri/resources/sing-box.exe"
+
       - run: npm run build
       - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - run: cargo test --manifest-path src-tauri/Cargo.toml
