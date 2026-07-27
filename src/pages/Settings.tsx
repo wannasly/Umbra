@@ -492,7 +492,7 @@ export function Settings() {
         <div className="flex items-center justify-between py-2">
           <div>
             <div className="text-[14px] font-semibold text-text">
-              {t("settings.about.version", { version: "v0.1.0" })}
+              {t("settings.about.version", { version: "v0.1.1" })}
             </div>
             <div className="mt-0.5 text-[13px] text-text-dim">
               {t("settings.about.description")}
