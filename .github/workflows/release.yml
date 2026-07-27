@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  SING_BOX_VERSION: "1.13.14"
+  SING_BOX_ARCHIVE_SHA256: "f580782c6dd10f7691c66cea1d7c421813c5fbf7e305d1ee7ce0c3a40d196341"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Download verified sing-box core
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "sing-box.zip"
+          $url = "https://github.com/SagerNet/sing-box/releases/download/v$env:SING_BOX_VERSION/sing-box-$env:SING_BOX_VERSION-windows-amd64.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:SING_BOX_ARCHIVE_SHA256) {
+            throw "sing-box archive checksum mismatch: $actual"
+          }
+          $expanded = Join-Path $env:RUNNER_TEMP "sing-box"
+          Expand-Archive -LiteralPath $archive -DestinationPath $expanded
+          New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
+          Copy-Item -LiteralPath "$expanded/sing-box-$env:SING_BOX_VERSION-windows-amd64/sing-box.exe" -Destination "src-tauri/resources/sing-box.exe"
+
+      - name: Test
+        run: |
+          npm run build
+          cargo test --manifest-path src-tauri/Cargo.toml
+
+      - name: Build NSIS installer
+        run: npm run tauri build
+
+      - name: Package release files
+        shell: pwsh
+        run: |
+          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
+          $release = New-Item -ItemType Directory -Force -Path release
+          $portable = New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/Umbra-portable"
+          New-Item -ItemType Directory -Force -Path "$portable/resources" | Out-Null
+          Copy-Item -LiteralPath "src-tauri/target/release/umbra.exe" -Destination "$portable/Umbra.exe"
+          Copy-Item -LiteralPath "src-tauri/resources/sing-box.exe" -Destination "$portable/resources/sing-box.exe"
+          Copy-Item -LiteralPath "LICENSE" -Destination "$portable/LICENSE.txt"
+          Copy-Item -LiteralPath "THIRD_PARTY_NOTICES.md" -Destination "$portable/THIRD_PARTY_NOTICES.md"
+          Compress-Archive -Path "$portable/*" -DestinationPath "$release/Umbra_${version}_windows_x64_portable.zip"
+          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*setup.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not produced" }
+          Copy-Item -LiteralPath $installer.FullName -Destination "$release/Umbra_${version}_x64-setup.exe"
+          Copy-Item -LiteralPath "THIRD_PARTY_NOTICES.md" -Destination "$release/THIRD_PARTY_NOTICES.md"
+          Get-ChildItem "$release/*" -File |
+            Where-Object Name -ne "SHA256SUMS.txt" |
+            ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
+            Set-Content -Encoding ascii "$release/SHA256SUMS.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Umbra-Windows-x64
+          path: release/*
+
+      - name: Publish GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: release/*

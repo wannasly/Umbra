@@ -1,0 +1,56 @@
+[package]
+name = "umbra"
+version = "0.1.0"
+description = "Umbra — a sleek sing-box GUI client"
+authors = ["umbra"]
+edition = "2021"
+
+[lib]
+name = "umbra_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-clipboard-manager = "2"
+
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "net", "fs", "rt-multi-thread"] }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream", "gzip"] }
+tokio-tungstenite = "0.30"
+futures-util = "0.3"
+
+base64 = "0.22"
+url = "2"
+percent-encoding = "2"
+uuid = { version = "1", features = ["v4"] }
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+zip = "2"
+sha2 = "0.10"
+semver = "1"
+rand = "0.8"
+
+[target."cfg(windows)".dependencies]
+winreg = "0.56"
+windows = { version = "0.62", features = [
+  "Win32_Foundation",
+  "Win32_Networking_WinInet",
+  "Win32_UI_Shell",
+  "Win32_UI_WindowsAndMessaging",
+  "Win32_Security",
+  "Win32_System_Threading",
+  "Win32_System_JobObjects",
+] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

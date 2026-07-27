@@ -1,0 +1,311 @@
+{
+  "titlebar": {
+    "minimize": "Minimize",
+    "maximize": "Maximize",
+    "restore": "Restore",
+    "close": "Close"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "servers": "Servers",
+    "subscriptions": "Subscriptions",
+    "routing": "Routing",
+    "logs": "Logs",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "status": {
+      "disconnected": "Disconnected",
+      "connecting": "Connecting…",
+      "connected": "Connected",
+      "stopping": "Stopping…"
+    },
+    "mode": {
+      "label": "Mode",
+      "system": "System proxy",
+      "tun": "TUN mode",
+      "lockedHint": "Disconnect to change mode",
+      "systemHint": "Written into the Windows proxy settings — covers apps that honour them",
+      "tunHint": "Virtual adapter — all system traffic, requires administrator rights"
+    },
+    "traffic": {
+      "download": "Download",
+      "upload": "Upload",
+      "session": "Session",
+      "uptime": "Uptime"
+    },
+    "server": {
+      "totalLabel": "Total through this server",
+      "totalUnavailable": "not tracked yet",
+      "change": "Change",
+      "gone": "This server is no longer in the list, but the connection is up"
+    },
+    "ping": {
+      "refresh": "Refresh ping",
+      "hint": "Ping only refreshes when you ask"
+    },
+    "chart": {
+      "waiting": "Waiting for traffic",
+      "resting": "Not connected",
+      "peak": "peak {{value}}"
+    },
+    "noServer": "No server selected",
+    "chooseServer": "Choose a server",
+    "hintConnect": "Press to connect",
+    "hintDisconnect": "Press to disconnect",
+    "hintCancel": "Click to cancel"
+  },
+  "servers": {
+    "title": "Servers",
+    "add": "Add server",
+    "testAll": "Test all",
+    "search": "Filter by name or address…",
+    "count_one": "{{count}} server",
+    "count_other": "{{count}} servers",
+    "manualGroup": "My servers",
+    "favoritesGroup": "Favorites",
+    "favorite": "Add to favorites",
+    "unfavorite": "Remove from favorites",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "totalTraffic": "Total through this server",
+    "sort": {
+      "default": "Default order",
+      "ping": "By ping",
+      "name": "By name"
+    },
+    "menu": {
+      "ping": "Test ping",
+      "copyLink": "Copy link",
+      "delete": "Delete"
+    },
+    "deleteConfirm": {
+      "title": "Delete server?",
+      "body": "\"{{name}}\" will be removed.",
+      "confirm": "Delete"
+    },
+    "addModal": {
+      "title": "Add server",
+      "pasteHint": "Paste vless:// links (one per line)",
+      "fromClipboard": "Paste from clipboard",
+      "importN_one": "Import {{count}} server",
+      "importN_other": "Import {{count}} servers",
+      "invalid": "No valid links detected",
+      "imported_one": "{{count}} server imported",
+      "imported_other": "{{count}} servers imported"
+    },
+    "reconnectToApply": "Reconnect to apply",
+    "selectedToast": "Server selected",
+    "empty": {
+      "title": "No servers yet",
+      "hint": "Paste a vless:// link or add a subscription"
+    },
+    "copied": "Link copied"
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "add": "Add subscription",
+    "updateNow": "Update now",
+    "delete": "Delete",
+    "updatedAgo": "Updated {{ago}}",
+    "never": "Never updated",
+    "serverCount_one": "{{count}} server",
+    "serverCount_other": "{{count}} servers",
+    "autoUpdate": "Auto-update",
+    "autoOff": "Off",
+    "autoHours": "{{count}}h",
+    "expires": "Expires {{date}}",
+    "expired": "Expired",
+    "daysLeft_one": "{{count}} day left",
+    "daysLeft_other": "{{count}} days left",
+    "trafficUsed": "{{used}} of {{total}} used",
+    "rename": "Rename",
+    "support": "Support",
+    "accountPage": "Account page",
+    "addModal": {
+      "title": "Add subscription",
+      "url": "Subscription URL",
+      "name": "Name (optional)",
+      "namePlaceholder": "My provider",
+      "nameHint": "Leave empty to use the name the panel sends"
+    },
+    "deleteConfirm": {
+      "title": "Delete subscription?",
+      "body_one": "\"{{name}}\" and its {{count}} server will be removed.",
+      "body_other": "\"{{name}}\" and its {{count}} servers will be removed.",
+      "confirm": "Delete"
+    },
+    "updated": "Subscription updated: +{{added}} / −{{removed}}",
+    "added": "Subscription added",
+    "empty": {
+      "title": "No subscriptions",
+      "hint": "Add your provider's subscription URL to import servers automatically"
+    }
+  },
+  "routing": {
+    "title": "Routing",
+    "add": "Add application",
+    "delete": "Delete rule",
+    "ruleCount_one": "{{count}} application rule",
+    "ruleCount_other": "{{count}} application rules",
+    "actions": {
+      "proxy": "Proxy",
+      "direct": "Direct",
+      "block": "Block"
+    },
+    "actionHints": {
+      "proxy": "Traffic through the selected server",
+      "direct": "Bypass the tunnel",
+      "block": "Network connections denied"
+    },
+    "default": {
+      "title": "Other traffic",
+      "hint": "Route for applications without a dedicated rule"
+    },
+    "tunNotice": "Full application control requires TUN mode. System proxy only sees programs that use the Windows proxy settings.",
+    "openMode": "Choose mode",
+    "reconnectNotice": "Rules are saved. Reconnect to apply them to the current connection.",
+    "reconnect": "Reconnect",
+    "empty": {
+      "title": "No application rules",
+      "hint": "Every application uses the route for other traffic"
+    },
+    "addModal": {
+      "title": "Add application",
+      "process": "Process name",
+      "placeholder": "for example, chrome.exe",
+      "chooseExe": "Choose an EXE file",
+      "action": "Route"
+    }
+  },
+  "logs": {
+    "title": "Logs",
+    "levels": {
+      "all": "All",
+      "debug": "Debug",
+      "info": "Info",
+      "warn": "Warn",
+      "error": "Error"
+    },
+    "search": "Search logs…",
+    "pause": "Pause",
+    "resume": "Resume",
+    "copy": "Copy",
+    "clear": "Clear",
+    "newLines_one": "{{count}} new line",
+    "newLines_other": "{{count}} new lines",
+    "copied": "Copied to clipboard",
+    "empty": {
+      "title": "No log entries",
+      "hint": "Connect to see sing-box output here"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "general": {
+      "title": "General",
+      "language": "Language",
+      "autostart": "Launch at startup",
+      "startMinimized": "Start minimized to tray",
+      "closeToTray": "Close button hides to tray",
+      "connectOnStartup": "Connect automatically on launch"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "accent": "Accent color",
+      "reduceMotion": "Reduce animations",
+      "accents": {
+        "violet": "Wave",
+        "cyan": "Surf",
+        "emerald": "Abyss",
+        "amber": "Foam"
+      }
+    },
+    "connection": {
+      "title": "Connection",
+      "bypassRu": "Bypass Russian sites (direct)",
+      "tunTitle": "TUN options",
+      "tunStack": "Network stack",
+      "strictRoute": "Strict route",
+      "mtu": "MTU",
+      "tunAdminNote": "TUN mode requires administrator rights. Umbra will ask to relaunch elevated when you enable it."
+    },
+    "subscriptions": {
+      "title": "Subscriptions",
+      "sendHwid": "Send device ID (HWID)",
+      "sendHwidHint": "Some panels only serve the real server list when the client identifies itself. The ID is derived from this machine and never contains personal data.",
+      "hwid": "Device ID",
+      "copyHwid": "Copy device ID",
+      "hwidCopied": "Device ID copied",
+      "userAgent": "Subscription User-Agent",
+      "reset": "Reset",
+      "userAgentNote": "Panels serve different formats depending on the User-Agent. Changing it can help when a panel refuses to serve the list."
+    },
+    "core": {
+      "title": "sing-box core",
+      "installed": "Installed",
+      "notInstalled": "Not installed",
+      "latest": "Latest",
+      "check": "Check for updates",
+      "download": "Download & install",
+      "downloading": "Downloading…",
+      "extracting": "Extracting…",
+      "upToDate": "Up to date",
+      "updateAvailable": "Update available: {{version}}",
+      "openFolder": "Open data folder",
+      "mirror": "GitHub mirror (optional)",
+      "mirrorPlaceholder": "https://gh-proxy.example/"
+    },
+    "about": {
+      "title": "About",
+      "version": "Umbra {{version}}",
+      "description": "A sleek sing-box GUI client"
+    }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close",
+    "add": "Add",
+    "delete": "Delete",
+    "connect": "Connect",
+    "disconnect": "Disconnect",
+    "loading": "Loading…",
+    "error": "Error",
+    "retry": "Retry",
+    "confirm": "Confirm",
+    "timeout": "timeout",
+    "coreCrashed": "sing-box crashed (code {{code}})",
+    "coreRestarting": "Restarting automatically…",
+    "elevation": {
+      "title": "Administrator rights required",
+      "body": "TUN mode needs administrator rights to create a network adapter. Restart Umbra as administrator?",
+      "restart": "Restart as admin"
+    },
+    "errors": {
+      "hwidRequired": "This subscription requires a device ID. Turn on \"Send device ID (HWID)\" in Settings → Subscriptions and try again.",
+      "deviceLimit": "Device limit reached: this subscription already has the maximum number of registered devices. Unlink one in your provider’s panel, then try again."
+    }
+  },
+  "units": {
+    "bps": "B/s",
+    "kbps": "KB/s",
+    "mbps": "MB/s",
+    "gbps": "GB/s",
+    "b": "B",
+    "kb": "KB",
+    "mb": "MB",
+    "gb": "GB",
+    "tb": "TB",
+    "ms": "ms"
+  },
+  "time": {
+    "justNow": "just now",
+    "minutesAgo_one": "{{count}} minute ago",
+    "minutesAgo_other": "{{count}} minutes ago",
+    "hoursAgo_one": "{{count}} hour ago",
+    "hoursAgo_other": "{{count}} hours ago",
+    "daysAgo_one": "{{count}} day ago",
+    "daysAgo_other": "{{count}} days ago"
+  }
+}

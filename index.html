@@ -1,0 +1,17 @@
+<!doctype html>
+<!-- The inline background is the first paint, before any CSS loads: it must be
+     the sea palette's abyss (--color-bg-deep), otherwise the window flashes the
+     old near-black violet on every launch. `lang` is a boot default only —
+     src/i18n keeps it in sync with the active language. -->
+<html lang="ru" style="background: #00131a">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Umbra</title>
+  </head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

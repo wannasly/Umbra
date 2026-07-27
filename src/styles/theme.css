@@ -1,0 +1,364 @@
+@import "tailwindcss";
+
+/*
+  Umbra — sea palette.
+
+  Derived from the four reference values the user picked, taken a step darker
+  as he asked ("чуть темнее"):
+
+    #c4dfe6  sea foam    -> text
+    #66a5ad  wave        -> accent
+    #07575b  ocean       -> panels / raised surfaces
+    #003b46  deep water  -> the *lightest* background we allow
+
+  Everything below sits on hue ~187. The three semantic colors deliberately
+  leave that hue (green 147, amber 39, rose 349) so "connected" can never be
+  confused with the accent — the one thing this palette makes easy to get wrong.
+  Measured against the page background: text 10.4:1, text-dim 7.1:1,
+  text-faint 5.5:1, accent 5.7:1, ok/warn ~9:1, danger 5.9:1.
+*/
+
+@theme {
+  /* ---------- Backgrounds (all darker than #003b46) ---------- */
+  --color-bg-deep: #00131a; /* abyss — bottom of the page gradient */
+  --color-bg-base: #002630; /* the app surface */
+  --color-bg-raise: #06414d; /* raised panels, between deep water and ocean */
+
+  /* ---------- Glass (sea-foam tinted, not neutral white) ---------- */
+  --color-glass: rgb(196 223 230 / 0.06);
+  --color-glass-strong: rgb(196 223 230 / 0.115);
+  --color-glass-border: rgb(196 223 230 / 0.14);
+  --color-glass-edge: rgb(196 223 230 / 0.2);
+
+  /* ---------- Brand / accents ---------- */
+  --color-accent: #66a5ad; /* wave */
+  --color-accent-2: #7ecfda; /* surf spray — the lighter half of every gradient */
+
+  /* ---------- Semantics: off-hue on purpose ---------- */
+  --color-ok: #2fe07f; /* connected — spring green, ~40 deg off the wave hue */
+  --color-warn: #f2b544;
+  --color-danger: #f9718a;
+
+  /* ---------- Text: sea foam ----------
+     Alphas are set by the contrast floor, not by taste. Measured against the
+     three surfaces text actually lands on — page (#002630), glass (+6% foam)
+     and glass-strong (+11.5% foam) — every step clears WCAG AA 4.5:1 on all
+     three, worst case first:
+       faint 0.64 -> 4.52 / 4.98 / 5.46
+       dim   0.76 -> 5.69 / 6.38 / 7.13
+       text  0.95 -> 7.92 / 9.09 / 10.4
+     faint was 0.5, which measured 3.37 on glass-strong and 3.87 on the page —
+     failing AA everywhere and the main reason the small captions read as washed
+     out. dim was 0.68; it passed, but 0.76 keeps the three steps apart now that
+     faint has come up. */
+  --color-text: rgb(196 223 230 / 0.95);
+  --color-text-dim: rgb(196 223 230 / 0.76);
+  --color-text-faint: rgb(196 223 230 / 0.64);
+
+  /* ---------- Typography ---------- */
+  --font-display: "Manrope Variable", "Inter Variable", system-ui, sans-serif;
+  --font-sans: "Inter Variable", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  /*
+    Type scale. The reference is the user's own site: Manrope, h2 67px / h3 38px
+    on a near-black background — several times larger than the 14px this app
+    shipped with. Manrope's variable axis stops at 800, so 800 *is* the black
+    weight here; asking for 900 renders identically.
+
+    Fluid, because the shell spans 900px to a maximised window and a fixed 44px
+    headline would either overflow the small end or look lost on the large one.
+    The vw term is tuned so each token hits its floor at ~900px and its ceiling
+    around 1500px.
+  */
+  --text-hero: clamp(2rem, 3.2vw, 2.75rem); /* 32 → 44  server name */
+  --text-hero--line-height: 1.04;
+  --text-hero--letter-spacing: -0.02em;
+
+  --text-stat: clamp(1.5rem, 2.35vw, 2.125rem); /* 24 → 34  headline numerals */
+  --text-stat--line-height: 1.05;
+  --text-stat--letter-spacing: -0.015em;
+
+  --text-status: clamp(1.25rem, 1.85vw, 1.625rem); /* 20 → 26  status word */
+  --text-status--line-height: 1.15;
+
+  --text-figure: clamp(1.125rem, 1.45vw, 1.375rem); /* 18 → 22  secondary numerals */
+  --text-figure--line-height: 1.2;
+
+  --text-lead: clamp(0.9375rem, 1.05vw, 1.0625rem); /* 15 → 17  body-plus */
+  --text-lead--line-height: 1.45;
+
+  --text-label: 0.75rem; /* 12  uppercase captions */
+  --text-label--line-height: 1.25;
+  --text-label--letter-spacing: 0.1em;
+
+  /* A general lift of the built-in steps: every page in the app was a size
+     too small, and raising these fixes them without editing each file. */
+  --text-xs: 0.8125rem; /* 12 → 13 */
+  --text-sm: 0.9375rem; /* 14 → 15 */
+
+  /* ---------- Radii ---------- */
+  --radius-panel: 22px;
+  --radius-card: 18px;
+  --radius-ctl: 12px;
+  --radius-chip: 999px;
+
+  /* ---------- Effects ---------- */
+  --blur-glass: 20px;
+  --shadow-panel: 0 8px 32px rgb(0 8 11 / 0.5);
+  --shadow-glow-ok: 0 0 26px rgb(47 224 127 / 0.34), 0 0 84px rgb(47 224 127 / 0.14);
+  --shadow-glow-accent: 0 0 26px rgb(126 207 218 / 0.38), 0 0 84px rgb(102 165 173 / 0.18);
+  --shadow-glow-danger: 0 0 26px rgb(249 113 138 / 0.34);
+}
+
+/*
+  Accent presets, applied via data-accent on <html>. The four ids are persisted
+  by the backend and must keep their names; only what they *look* like changed —
+  each is now a depth of the same sea, spread far enough apart in hue (teal →
+  cyan → blue → pale foam) to be tellable apart in the settings picker, and none
+  of them lands near the green that means "connected".
+
+  "violet" is the default and lives in @theme above (wave).
+*/
+:root[data-accent="cyan"] {
+  /* surf */
+  --color-accent: #5ad0e0;
+  --color-accent-2: #a9e4ec;
+  --shadow-glow-accent: 0 0 26px rgb(90 208 224 / 0.4), 0 0 84px rgb(90 208 224 / 0.18);
+}
+:root[data-accent="emerald"] {
+  /* abyss — deeper, bluer water */
+  --color-accent: #4a86b8;
+  --color-accent-2: #66a5ad;
+  --shadow-glow-accent: 0 0 26px rgb(74 134 184 / 0.42), 0 0 84px rgb(74 134 184 / 0.2);
+}
+:root[data-accent="amber"] {
+  /* foam — near-monochrome, the quiet option */
+  --color-accent: #c4dfe6;
+  --color-accent-2: #8fc2cc;
+  --shadow-glow-accent: 0 0 26px rgb(196 223 230 / 0.3), 0 0 84px rgb(196 223 230 / 0.12);
+}
+
+@utility glass {
+  background: var(--color-glass);
+  border: 1px solid var(--color-glass-border);
+  border-radius: var(--radius-panel);
+  backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+  box-shadow: var(--shadow-panel), inset 0 1px 0 var(--color-glass-edge);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* was 14px — the single biggest reason the whole app read as "мелко" */
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  background:
+    radial-gradient(900px 620px at 12% -12%, rgb(7 87 91 / 0.55), transparent 62%),
+    radial-gradient(760px 540px at 106% 12%, rgb(102 165 173 / 0.2), transparent 58%),
+    radial-gradient(820px 720px at 50% 122%, rgb(0 59 70 / 0.6), transparent 62%),
+    linear-gradient(158deg, var(--color-bg-base), var(--color-bg-deep));
+}
+
+/* Aurora blobs: two blurred color fields drifting behind the content.
+   .connected on the container shifts the primary blob toward the ok green. */
+.aurora {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.aurora::before,
+.aurora::after {
+  content: "";
+  position: absolute;
+  width: 46vw;
+  height: 46vw;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform;
+  transition: background 1.2s ease;
+}
+.aurora::before {
+  top: -18vw;
+  left: -8vw;
+  background: rgb(7 87 91 / 0.5);
+  animation: aurora-drift-a 60s ease-in-out infinite alternate;
+}
+.aurora::after {
+  bottom: -20vw;
+  right: -10vw;
+  background: rgb(102 165 173 / 0.16);
+  animation: aurora-drift-b 75s ease-in-out infinite alternate;
+}
+.aurora.connected::before {
+  background: rgb(47 224 127 / 0.14);
+}
+.aurora.connected::after {
+  background: rgb(47 224 127 / 0.09);
+}
+@keyframes aurora-drift-a {
+  to {
+    transform: translate(14vw, 10vh) scale(1.15);
+  }
+}
+@keyframes aurora-drift-b {
+  to {
+    transform: translate(-10vw, -12vh) scale(1.1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aurora::before,
+  .aurora::after {
+    animation: none;
+  }
+}
+
+/* Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgb(196 223 230 / 0.16);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgb(196 223 230 / 0.28);
+}
+
+/* Conic spinner ring for the connecting state (cheap CSS animation) */
+@property --spin-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+.conic-ring {
+  background: conic-gradient(
+    from var(--spin-angle),
+    transparent 0deg,
+    var(--color-warn) 90deg,
+    transparent 180deg
+  );
+  animation: conic-spin 1.1s linear infinite;
+}
+@keyframes conic-spin {
+  to {
+    --spin-angle: 360deg;
+  }
+}
+
+/*
+  Resting tide for the traffic chart. Each band is drawn twice the chart's width
+  with a period of exactly one chart width, so translating by 100% of the
+  view-box lands the wave back on itself and the loop is seamless. This is what
+  fills the hole the chart used to leave when nothing is flowing.
+  The two bands drift in opposite directions at unrelated speeds so they never
+  settle into a visible beat.
+*/
+.tide-a {
+  animation: tide-drift-a 19s linear infinite;
+}
+.tide-b {
+  animation: tide-drift-b 31s linear infinite;
+}
+@keyframes tide-drift-a {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes tide-drift-b {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tide-a,
+  .tide-b {
+    animation: none;
+  }
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* A short or portrait window becomes a compact horizontal workspace. Motion's
+   layout animation carries the rail from the left edge to this bottom dock. */
+@media (max-height: 620px), (orientation: portrait) {
+  .app-workspace {
+    flex-direction: column;
+  }
+
+  .app-main {
+    order: 1;
+    width: 100%;
+  }
+
+  .app-nav {
+    order: 2;
+    width: 100% !important;
+    height: 62px;
+    flex-direction: row;
+    padding: 8px 12px;
+    border-top: 1px solid var(--color-glass-border);
+    background: rgb(0 19 26 / 0.82);
+    backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+    box-shadow: 0 -10px 30px rgb(0 8 11 / 0.25);
+  }
+
+  .app-nav-list {
+    min-width: 0;
+    flex: 1;
+    flex-direction: row;
+    gap: 6px;
+  }
+
+  .app-nav-button {
+    height: 44px;
+    min-width: 0;
+    flex: 1;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding-inline: 10px !important;
+  }
+
+  .app-nav-label {
+    display: none !important;
+  }
+
+  .app-nav-indicator-edge {
+    inset: auto 12px 0 !important;
+    width: auto !important;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+  }
+
+  .app-nav-status,
+  .app-nav-version {
+    display: none !important;
+  }
+
+  .app-page-frame {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+}
