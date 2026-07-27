@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { Copy, FolderOpen } from "lucide-react";
-import { open } from "@tauri-apps/plugin-opener";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import {
   ipc,
   type Accent,
@@ -500,7 +500,7 @@ export function Settings() {
           </div>
           <Button
             variant="ghost"
-            onClick={() => void open("https://github.com/wannasly/Umbra/releases/latest")}
+            onClick={() => void openUrl("https://github.com/wannasly/Umbra/releases/latest")}
           >
             {t("settings.about.updateApp")}
           </Button>
