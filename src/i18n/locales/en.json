@@ -259,7 +259,8 @@
     "about": {
       "title": "About",
       "version": "Umbra {{version}}",
-      "description": "A sleek sing-box GUI client"
+      "description": "A sleek sing-box GUI client",
+      "updateApp": "Check for updates"
     }
   },
   "common": {

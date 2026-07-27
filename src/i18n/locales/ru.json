@@ -265,7 +265,8 @@
     "about": {
       "title": "О программе",
       "version": "Umbra {{version}}",
-      "description": "Элегантный GUI-клиент для sing-box"
+      "description": "Элегантный GUI-клиент для sing-box",
+      "updateApp": "Проверить обновления"
     }
   },
   "common": {

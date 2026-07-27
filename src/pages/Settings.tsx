@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { motion } from "motion/react";
 import { Copy, FolderOpen } from "lucide-react";
+import { open } from "@tauri-apps/plugin-opener";
 import {
   ipc,
   type Accent,
@@ -488,13 +489,21 @@ export function Settings() {
       <CoreSection />
 
       <Section title={t("settings.about.title")}>
-        <div className="py-2">
-          <div className="text-[14px] font-semibold text-text">
-            {t("settings.about.version", { version: "v0.1.0" })}
+        <div className="flex items-center justify-between py-2">
+          <div>
+            <div className="text-[14px] font-semibold text-text">
+              {t("settings.about.version", { version: "v0.1.0" })}
+            </div>
+            <div className="mt-0.5 text-[13px] text-text-dim">
+              {t("settings.about.description")}
+            </div>
           </div>
-          <div className="mt-0.5 text-[13px] text-text-dim">
-            {t("settings.about.description")}
-          </div>
+          <Button
+            variant="ghost"
+            onClick={() => void open("https://github.com/wannasly/Umbra/releases/latest")}
+          >
+            {t("settings.about.updateApp")}
+          </Button>
         </div>
       </Section>
     </PageShell>
