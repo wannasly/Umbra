@@ -224,6 +224,13 @@
     "connection": {
       "title": "Connection",
       "bypassRu": "Bypass Russian sites (direct)",
+      "ipStrategy": "IP Strategy (DNS)",
+      "ipStrategies": {
+        "ipv4_only": "IPv4 only (recommended)",
+        "prefer_ipv4": "Prefer IPv4",
+        "prefer_ipv6": "Prefer IPv6",
+        "ipv6_only": "IPv6 only"
+      },
       "tunTitle": "TUN options",
       "tunStack": "Network stack",
       "strictRoute": "Strict route",

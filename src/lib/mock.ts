@@ -183,6 +183,7 @@ const state: {
     tunStack: "mixed",
     tunStrictRoute: true,
     tunMtu: 9000,
+    ipStrategy: "ipv4_only",
     pingUrl: "https://www.gstatic.com/generate_204",
     reduceMotion: false,
     serverSort: "default",

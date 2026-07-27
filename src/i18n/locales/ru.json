@@ -230,6 +230,13 @@
     "connection": {
       "title": "Подключение",
       "bypassRu": "Не проксировать российские сайты",
+      "ipStrategy": "Стратегия IP (DNS)",
+      "ipStrategies": {
+        "ipv4_only": "Только IPv4 (рекомендуется)",
+        "prefer_ipv4": "Предпочитать IPv4",
+        "prefer_ipv6": "Предпочитать IPv6",
+        "ipv6_only": "Только IPv6"
+      },
       "tunTitle": "Параметры TUN",
       "tunStack": "Сетевой стек",
       "strictRoute": "Строгая маршрутизация",

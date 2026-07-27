@@ -301,9 +301,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* A short or portrait window becomes a compact horizontal workspace. Motion's
+/* A short, narrow, or portrait window becomes a compact horizontal workspace. Motion's
    layout animation carries the rail from the left edge to this bottom dock. */
-@media (max-height: 620px), (orientation: portrait) {
+@media (max-height: 620px), (max-width: 640px), (orientation: portrait) {
   .app-workspace {
     flex-direction: column;
   }

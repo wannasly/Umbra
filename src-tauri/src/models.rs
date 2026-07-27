@@ -269,6 +269,32 @@ pub struct ProxyBackup {
     pub bypass_list: Option<String>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IpStrategy {
+    Ipv4Only,
+    PreferIpv4,
+    PreferIpv6,
+    Ipv6Only,
+}
+
+impl Default for IpStrategy {
+    fn default() -> Self {
+        IpStrategy::Ipv4Only
+    }
+}
+
+impl IpStrategy {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            IpStrategy::Ipv4Only => "ipv4_only",
+            IpStrategy::PreferIpv4 => "prefer_ipv4",
+            IpStrategy::PreferIpv6 => "prefer_ipv6",
+            IpStrategy::Ipv6Only => "ipv6_only",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Settings {
@@ -291,6 +317,7 @@ pub struct Settings {
     pub tun_stack: String,
     pub tun_strict_route: bool,
     pub tun_mtu: u32,
+    pub ip_strategy: IpStrategy,
     pub ping_url: String,
     pub reduce_motion: bool,
     /// Server-list ordering: "default" (as delivered), "ping" or "name".
@@ -332,6 +359,7 @@ impl Default for Settings {
             tun_stack: "mixed".into(),
             tun_strict_route: true,
             tun_mtu: 9000,
+            ip_strategy: IpStrategy::Ipv4Only,
             ping_url: "https://www.gstatic.com/generate_204".into(),
             reduce_motion: false,
             server_sort: "default".into(),

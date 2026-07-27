@@ -82,7 +82,7 @@ pub fn generate(
                 { "tag": "dns-local", "type": "local" }
             ],
             "final": "dns-remote",
-            "strategy": "prefer_ipv4",
+            "strategy": settings.ip_strategy.as_str(),
             "independent_cache": true
         },
         "inbounds": inbounds(settings),
@@ -217,7 +217,10 @@ fn inbounds(settings: &Settings) -> Value {
             "auto_route": true,
             "strict_route": settings.tun_strict_route,
             "stack": settings.tun_stack,
-            "endpoint_independent_nat": true
+            "endpoint_independent_nat": true,
+            "udp_timeout": "5m",
+            "sniff": true,
+            "sniff_override_destination": false
         }]),
     }
 }
@@ -582,6 +585,18 @@ mod tests {
         assert_eq!(inb["auto_route"], true);
         assert_eq!(inb["strict_route"], false);
         assert_eq!(inb["stack"], "gvisor");
+        assert_eq!(inb["udp_timeout"], "5m");
+        assert_eq!(inb["sniff"], true);
+        assert_eq!(inb["sniff_override_destination"], false);
+    }
+
+    #[test]
+    fn custom_ip_strategy_setting() {
+        let servers = vec![entry("a", "S")];
+        let mut settings = Settings::default();
+        settings.ip_strategy = crate::models::IpStrategy::PreferIpv6;
+        let cfg = gen(&settings, &servers, "a");
+        assert_eq!(at(&cfg, "/dns/strategy"), "prefer_ipv6");
     }
 
     #[test]
@@ -634,7 +649,7 @@ mod tests {
         assert_eq!(at(&cfg, "/dns/servers/0/detour"), "proxy");
         assert_eq!(at(&cfg, "/dns/servers/1/type"), "local");
         assert_eq!(at(&cfg, "/dns/final"), "dns-remote");
-        assert_eq!(at(&cfg, "/dns/strategy"), "prefer_ipv4");
+        assert_eq!(at(&cfg, "/dns/strategy"), "ipv4_only");
         assert_eq!(at(&cfg, "/dns/independent_cache"), true);
         assert_eq!(at(&cfg, "/route/final"), "proxy");
         assert_eq!(at(&cfg, "/route/auto_detect_interface"), true);

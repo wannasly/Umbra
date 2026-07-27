@@ -122,6 +122,8 @@ export interface AppRouteRule {
   action: AppRouteAction;
 }
 
+export type IpStrategy = "ipv4_only" | "prefer_ipv4" | "prefer_ipv6" | "ipv6_only";
+
 /** Synthetic group keys for `Settings.collapsedGroups` (never subscription ids). */
 export const GROUP_FAVORITES = "favorites";
 export const GROUP_MANUAL = "manual";
@@ -147,6 +149,7 @@ export interface Settings {
   tunStack: "mixed" | "system" | "gvisor";
   tunStrictRoute: boolean;
   tunMtu: number;
+  ipStrategy: IpStrategy;
   pingUrl: string;
   reduceMotion: boolean;
   /** server-list ordering on the Servers page */

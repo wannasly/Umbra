@@ -443,6 +443,19 @@ export function Settings() {
             aria-label={t("settings.connection.bypassRu")}
           />
         </Row>
+        <Row label={t("settings.connection.ipStrategy")}>
+          <Select<AppSettings["ipStrategy"]>
+            value={settings.ipStrategy ?? "ipv4_only"}
+            onChange={(v) => set("ipStrategy", v)}
+            options={[
+              { value: "ipv4_only", label: t("settings.connection.ipStrategies.ipv4_only") },
+              { value: "prefer_ipv4", label: t("settings.connection.ipStrategies.prefer_ipv4") },
+              { value: "prefer_ipv6", label: t("settings.connection.ipStrategies.prefer_ipv6") },
+              { value: "ipv6_only", label: t("settings.connection.ipStrategies.ipv6_only") },
+            ]}
+            className="w-56"
+          />
+        </Row>
         <div className="pt-3 pb-1 text-xs font-semibold tracking-[0.1em] text-text-faint uppercase">
           {t("settings.connection.tunTitle")}
         </div>
@@ -492,7 +505,7 @@ export function Settings() {
         <div className="flex items-center justify-between py-2">
           <div>
             <div className="text-[14px] font-semibold text-text">
-              {t("settings.about.version", { version: "v0.1.1" })}
+              {t("settings.about.version", { version: "v0.1.2" })}
             </div>
             <div className="mt-0.5 text-[13px] text-text-dim">
               {t("settings.about.description")}
