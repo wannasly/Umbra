@@ -216,7 +216,8 @@ fn inbounds(settings: &Settings) -> Value {
             "mtu": settings.tun_mtu,
             "auto_route": true,
             "strict_route": settings.tun_strict_route,
-            "stack": settings.tun_stack
+            "stack": settings.tun_stack,
+            "endpoint_independent_nat": true
         }]),
     }
 }
