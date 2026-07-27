@@ -218,9 +218,7 @@ fn inbounds(settings: &Settings) -> Value {
             "strict_route": settings.tun_strict_route,
             "stack": settings.tun_stack,
             "endpoint_independent_nat": true,
-            "udp_timeout": "5m",
-            "sniff": true,
-            "sniff_override_destination": false
+            "udp_timeout": "5m"
         }]),
     }
 }
@@ -586,8 +584,6 @@ mod tests {
         assert_eq!(inb["strict_route"], false);
         assert_eq!(inb["stack"], "gvisor");
         assert_eq!(inb["udp_timeout"], "5m");
-        assert_eq!(inb["sniff"], true);
-        assert_eq!(inb["sniff_override_destination"], false);
     }
 
     #[test]
