@@ -63,12 +63,34 @@ pub fn installed_version(core: &Path) -> Option<String> {
     parse_version_line(&String::from_utf8_lossy(&output.stdout))
 }
 
-/// First line looks like `sing-box version 1.11.9`.
+/// First line looks like `sing-box version 1.13.14`.
 fn parse_version_line(stdout: &str) -> Option<String> {
     let first = stdout.lines().next()?;
     let rest = first.trim().strip_prefix("sing-box version")?;
     let v = rest.split_whitespace().next()?;
     (!v.is_empty()).then(|| v.to_string())
+}
+
+pub fn is_version_compatible(version_str: &str) -> bool {
+    let clean = version_str.trim().trim_start_matches('v');
+    let mut parts = clean.split('.');
+    let major = parts.next().and_then(|s| s.parse::<u64>().ok());
+    let minor = parts.next().and_then(|s| s.parse::<u64>().ok());
+    matches!((major, minor), (Some(1), Some(13)))
+}
+
+pub fn ensure_compatible_core(core_path: &Path) -> AppResult<String> {
+    if !core_path.exists() {
+        return Err(AppError::CoreNotInstalled);
+    }
+    let ver = installed_version(core_path)
+        .ok_or_else(|| AppError::CoreStartFailed("failed to probe sing-box core version".into()))?;
+    if !is_version_compatible(&ver) {
+        return Err(AppError::Unsupported(format!(
+            "installed sing-box version {ver} is incompatible with Umbra (requires sing-box 1.13.x)"
+        )));
+    }
+    Ok(ver)
 }
 
 /// `installed_version` spawns a subprocess synchronously; keep it off the

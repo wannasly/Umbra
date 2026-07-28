@@ -85,8 +85,8 @@ pub fn save_settings(data_dir: &Path, settings: &Settings) -> AppResult<()> {
     write_json(&settings_path(data_dir), settings)
 }
 
-pub fn load_profiles(data_dir: &Path) -> ProfileStore {
-    read_json(&profiles_path(data_dir))
+pub fn load_profiles(data_dir: &Path) -> AppResult<ProfileStore> {
+    crate::storage_migration::load_and_migrate_profiles(&profiles_path(data_dir))
 }
 
 pub fn save_profiles(data_dir: &Path, profiles: &ProfileStore) -> AppResult<()> {
@@ -141,8 +141,8 @@ mod tests {
         let profiles = ProfileStore::default();
         save_profiles(&dir, &profiles).unwrap();
         assert!(profiles_path(&dir).exists());
-        let loaded = load_profiles(&dir);
-        assert_eq!(loaded.version, 1);
+        let loaded = load_profiles(&dir).unwrap();
+        assert_eq!(loaded.version, 2);
         fs::remove_dir_all(dir.parent().unwrap().parent().unwrap()).unwrap();
     }
 

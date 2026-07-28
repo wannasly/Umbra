@@ -7,7 +7,8 @@ use serde_json::{json, Map, Value};
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    AppRouteAction, Mode, RouteTarget, Security, ServerEntry, Settings, Transport,
+    AppRouteAction, Mode, ProxyKind, ProxyNode, RouteTarget, Security, ServerEntry, Settings,
+    Transport,
 };
 
 /// Outbound tags that always exist in the generated config; server tags must
@@ -62,7 +63,7 @@ pub fn generate(
         "tolerance": 50
     }));
     for (server, tag) in servers.iter().zip(tags.iter()) {
-        outbounds.push(vless_outbound(server, tag));
+        outbounds.push(server_outbound(server, tag));
     }
     outbounds.push(json!({ "type": "direct", "tag": "direct" }));
 
@@ -121,51 +122,58 @@ fn assign_tags(servers: &[&ServerEntry]) -> Vec<String> {
     tags
 }
 
-fn vless_outbound(s: &ServerEntry, tag: &str) -> Value {
+fn server_outbound(s: &ProxyNode, tag: &str) -> Value {
+    match &s.kind {
+        ProxyKind::Vless(v) => vless_outbound(s, v, tag),
+        ProxyKind::Hysteria2(h) => hysteria2_outbound(s, h, tag),
+    }
+}
+
+fn vless_outbound(s: &ProxyNode, v: &crate::models::VlessNode, tag: &str) -> Value {
     let mut o = Map::new();
     o.insert("type".into(), json!("vless"));
     o.insert("tag".into(), json!(tag));
     o.insert("server".into(), json!(s.server));
     o.insert("server_port".into(), json!(s.port));
-    o.insert("uuid".into(), json!(s.uuid));
-    if !s.flow.is_empty() {
-        o.insert("flow".into(), json!(s.flow));
+    o.insert("uuid".into(), json!(v.uuid));
+    if !v.flow.is_empty() {
+        o.insert("flow".into(), json!(v.flow));
     }
     o.insert("packet_encoding".into(), json!("xudp"));
 
-    if s.security != Security::None {
+    if v.security != Security::None {
         let mut tls = Map::new();
         tls.insert("enabled".into(), json!(true));
-        tls.insert("server_name".into(), json!(s.sni));
-        tls.insert("insecure".into(), json!(s.insecure));
-        if !s.fingerprint.is_empty() || s.security == Security::Reality {
-            let fingerprint = if s.fingerprint.is_empty() {
+        tls.insert("server_name".into(), json!(v.sni));
+        tls.insert("insecure".into(), json!(v.insecure));
+        if !v.fingerprint.is_empty() || v.security == Security::Reality {
+            let fingerprint = if v.fingerprint.is_empty() {
                 "chrome"
             } else {
-                s.fingerprint.as_str()
+                v.fingerprint.as_str()
             };
             tls.insert(
                 "utls".into(),
                 json!({ "enabled": true, "fingerprint": fingerprint }),
             );
         }
-        if !s.alpn.is_empty() {
-            tls.insert("alpn".into(), json!(s.alpn));
+        if !v.alpn.is_empty() {
+            tls.insert("alpn".into(), json!(v.alpn));
         }
-        if s.security == Security::Reality {
+        if v.security == Security::Reality {
             tls.insert(
                 "reality".into(),
                 json!({
                     "enabled": true,
-                    "public_key": s.public_key,
-                    "short_id": s.short_id
+                    "public_key": v.public_key,
+                    "short_id": v.short_id
                 }),
             );
         }
         o.insert("tls".into(), Value::Object(tls));
     }
 
-    match &s.transport {
+    match &v.transport {
         Transport::Tcp => {}
         Transport::Ws { path, host } => {
             let mut t = Map::new();
@@ -177,18 +185,60 @@ fn vless_outbound(s: &ServerEntry, tag: &str) -> Value {
             o.insert("transport".into(), Value::Object(t));
         }
         Transport::Grpc { service_name } => {
-            o.insert(
-                "transport".into(),
-                json!({ "type": "grpc", "service_name": service_name }),
-            );
+            let mut t = Map::new();
+            t.insert("type".into(), json!("grpc"));
+            t.insert("service_name".into(), json!(service_name));
+            o.insert("transport".into(), Value::Object(t));
         }
         Transport::Httpupgrade { path, host } => {
-            o.insert(
-                "transport".into(),
-                json!({ "type": "httpupgrade", "path": path, "host": host }),
-            );
+            let mut t = Map::new();
+            t.insert("type".into(), json!("httpupgrade"));
+            t.insert("path".into(), json!(path));
+            if !host.is_empty() {
+                t.insert("host".into(), json!(host));
+            }
+            o.insert("transport".into(), Value::Object(t));
         }
     }
+
+    Value::Object(o)
+}
+
+fn hysteria2_outbound(s: &ProxyNode, h: &crate::models::Hysteria2Node, tag: &str) -> Value {
+    let mut o = Map::new();
+    o.insert("type".into(), json!("hysteria2"));
+    o.insert("tag".into(), json!(tag));
+    o.insert("server".into(), json!(s.server));
+    o.insert("server_port".into(), json!(s.port));
+    o.insert("password".into(), json!(h.password));
+
+    let mut tls = Map::new();
+    tls.insert("enabled".into(), json!(true));
+    if !h.sni.is_empty() {
+        tls.insert("server_name".into(), json!(h.sni));
+    } else {
+        tls.insert("server_name".into(), json!(s.server));
+    }
+    tls.insert("insecure".into(), json!(h.insecure));
+    if !h.alpn.is_empty() {
+        tls.insert("alpn".into(), json!(h.alpn));
+    }
+    o.insert("tls".into(), Value::Object(tls));
+
+    if let Some(obfs) = &h.obfs {
+        match obfs {
+            crate::models::Hysteria2Obfs::Salamander { password } => {
+                o.insert(
+                    "obfs".into(),
+                    json!({
+                        "type": "salamander",
+                        "password": password
+                    }),
+                );
+            }
+        }
+    }
+
     Value::Object(o)
 }
 
@@ -302,34 +352,37 @@ mod tests {
         ServerEntry {
             id: id.into(),
             name: name.into(),
-            protocol: "vless".into(),
             server: "203.0.113.10".into(),
             port: 443,
-            uuid: "11111111-2222-3333-4444-555555555555".into(),
-            flow: String::new(),
-            security: Security::None,
-            sni: String::new(),
-            fingerprint: String::new(),
-            public_key: String::new(),
-            short_id: String::new(),
-            insecure: false,
-            alpn: Vec::new(),
-            transport: Transport::Tcp,
             last_ping_ms: None,
             favorite: false,
             total_up: 0,
             total_down: 0,
             raw: String::new(),
+            kind: ProxyKind::Vless(crate::models::VlessNode {
+                uuid: "11111111-2222-3333-4444-555555555555".into(),
+                flow: String::new(),
+                security: Security::None,
+                sni: String::new(),
+                fingerprint: String::new(),
+                public_key: String::new(),
+                short_id: String::new(),
+                insecure: false,
+                alpn: Vec::new(),
+                transport: Transport::Tcp,
+            }),
         }
     }
 
     fn reality_entry(id: &str, name: &str) -> ServerEntry {
         let mut s = entry(id, name);
-        s.security = Security::Reality;
-        s.flow = "xtls-rprx-vision".into();
-        s.sni = "cdn.example.org".into();
-        s.public_key = "pubkey123".into();
-        s.short_id = "ab12".into();
+        if let ProxyKind::Vless(ref mut v) = s.kind {
+            v.security = Security::Reality;
+            v.flow = "xtls-rprx-vision".into();
+            v.sni = "cdn.example.org".into();
+            v.public_key = "pubkey123".into();
+            v.short_id = "ab12".into();
+        }
         s
     }
 
@@ -372,17 +425,21 @@ mod tests {
     #[test]
     fn ws_outbound_host_header_and_no_flow() {
         let mut s = entry("a", "WS");
-        s.security = Security::Tls;
-        s.sni = "ws.example.org".into();
-        s.transport = Transport::Ws {
-            path: "/ws".into(),
-            host: "ws.example.org".into(),
-        };
+        if let ProxyKind::Vless(ref mut v) = s.kind {
+            v.security = Security::Tls;
+            v.sni = "ws.example.org".into();
+            v.transport = Transport::Ws {
+                path: "/ws".into(),
+                host: "ws.example.org".into(),
+            };
+        }
         let mut no_host = entry("b", "WS2");
-        no_host.transport = Transport::Ws {
-            path: "/p".into(),
-            host: String::new(),
-        };
+        if let ProxyKind::Vless(ref mut v) = no_host.kind {
+            v.transport = Transport::Ws {
+                path: "/p".into(),
+                host: String::new(),
+            };
+        }
         let cfg = gen(&Settings::default(), &[s, no_host], "a");
         let ob = at(&cfg, "/outbounds/2");
         assert!(ob.get("flow").is_none(), "empty flow must be omitted");
@@ -399,14 +456,18 @@ mod tests {
     #[test]
     fn grpc_and_httpupgrade_transports() {
         let mut g = entry("a", "G");
-        g.transport = Transport::Grpc {
-            service_name: "svc".into(),
-        };
+        if let ProxyKind::Vless(ref mut v) = g.kind {
+            v.transport = Transport::Grpc {
+                service_name: "svc".into(),
+            };
+        }
         let mut h = entry("b", "H");
-        h.transport = Transport::Httpupgrade {
-            path: "/up".into(),
-            host: "up.example.org".into(),
-        };
+        if let ProxyKind::Vless(ref mut v) = h.kind {
+            v.transport = Transport::Httpupgrade {
+                path: "/up".into(),
+                host: "up.example.org".into(),
+            };
+        }
         let cfg = gen(&Settings::default(), &[g, h], "b");
         assert_eq!(at(&cfg, "/outbounds/2/transport/type"), "grpc");
         assert_eq!(at(&cfg, "/outbounds/2/transport/service_name"), "svc");
@@ -425,13 +486,17 @@ mod tests {
     #[test]
     fn tls_alpn_and_utls_omission() {
         let mut bare = entry("a", "T1");
-        bare.security = Security::Tls;
-        bare.sni = "t.example.org".into();
+        if let ProxyKind::Vless(ref mut v) = bare.kind {
+            v.security = Security::Tls;
+            v.sni = "t.example.org".into();
+        }
         let mut full = entry("b", "T2");
-        full.security = Security::Tls;
-        full.sni = "t2.example.org".into();
-        full.fingerprint = "firefox".into();
-        full.alpn = vec!["h2".into(), "http/1.1".into()];
+        if let ProxyKind::Vless(ref mut v) = full.kind {
+            v.security = Security::Tls;
+            v.sni = "t2.example.org".into();
+            v.fingerprint = "firefox".into();
+            v.alpn = vec!["h2".into(), "http/1.1".into()];
+        }
         let cfg = gen(&Settings::default(), &[bare, full], "a");
         let t1 = at(&cfg, "/outbounds/2/tls");
         assert!(t1.get("alpn").is_none(), "empty alpn must be omitted");
@@ -660,5 +725,53 @@ mod tests {
         );
         assert_eq!(cfg.clash_port, 9090);
         assert_eq!(cfg.clash_secret, "s3cret");
+    }
+
+    #[test]
+    fn test_singbox_check_hysteria2() {
+        use std::path::Path;
+        let hy2_node = ProxyNode {
+            id: "hy2-1".into(),
+            name: "Hysteria2 Test".into(),
+            server: "1.1.1.1".into(),
+            port: 443,
+            last_ping_ms: None,
+            favorite: false,
+            total_up: 0,
+            total_down: 0,
+            raw: "".into(),
+            kind: ProxyKind::Hysteria2(crate::models::Hysteria2Node {
+                password: "testpass".into(),
+                obfs: Some(crate::models::Hysteria2Obfs::Salamander {
+                    password: "obfspass".into(),
+                }),
+                insecure: false,
+                sni: "example.com".into(),
+                alpn: vec!["h3".into()],
+            }),
+        };
+        let servers = vec![hy2_node];
+        let refs: Vec<&ProxyNode> = servers.iter().collect();
+        let cfg = generate(&Settings::default(), &refs, "hy2-1", 9090, "secret").unwrap();
+
+        let candidate_paths = [
+            Path::new("resources/sing-box.exe"),
+            Path::new("src-tauri/resources/sing-box.exe"),
+            Path::new("../resources/sing-box.exe"),
+        ];
+        if let Some(core) = candidate_paths.iter().find(|p| p.exists()) {
+            let tmp_dir = std::env::temp_dir();
+            let cfg_path = tmp_dir.join("test_hy2_cfg.json");
+            std::fs::write(&cfg_path, cfg.json.to_string()).unwrap();
+            let mut cmd = std::process::Command::new(core);
+            cmd.arg("check").arg("-c").arg(&cfg_path);
+            let out = cmd.output().expect("failed to execute sing-box check");
+            assert!(
+                out.status.success(),
+                "sing-box check failed for Hysteria2: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let _ = std::fs::remove_file(&cfg_path);
+        }
     }
 }

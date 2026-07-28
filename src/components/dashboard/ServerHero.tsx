@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, RefreshCw, Repeat, ServerOff } from "lucide-react";
 import type { ConnStatus, ServerEntry } from "../../lib/ipc";
 import { useServers } from "../../stores/servers";
 import { formatBytes } from "../../lib/format";
+import { getProxyChips } from "../../lib/serverMeta";
 import { cn } from "../../lib/cn";
 import { Button } from "../ui/Button";
 import { GlassCard } from "../ui/GlassCard";
@@ -152,11 +153,7 @@ export function ServerHero({
     );
   }
 
-  const chips = [
-    server.protocol.toUpperCase(),
-    server.security !== "none" ? server.security.toUpperCase() : null,
-    server.transport.type !== "tcp" ? server.transport.type.toUpperCase() : null,
-  ].filter((c): c is string => c !== null);
+  const chips = getProxyChips(server);
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -181,10 +178,10 @@ export function ServerHero({
         <span className="flex flex-wrap items-center gap-1.5">
           {chips.map((c) => (
             <span
-              key={c}
+              key={c.label}
               className="rounded-(--radius-chip) border border-glass-border bg-glass px-2.5 py-0.5 text-[11px] font-semibold tracking-wide text-text-dim"
             >
-              {c}
+              {c.label}
             </span>
           ))}
         </span>

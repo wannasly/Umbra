@@ -9,6 +9,7 @@ mod proxy;
 mod singbox;
 mod state;
 mod storage;
+mod storage_migration;
 mod subscription;
 mod tray;
 
@@ -51,7 +52,10 @@ pub fn run() {
             }
             singbox::version::install_bundled_core(app.handle(), &data_dir);
 
-            let profiles = storage::load_profiles(&data_dir);
+            let profiles = storage::load_profiles(&data_dir).unwrap_or_else(|e| {
+                eprintln!("[umbra] failed to load profiles: {e}");
+                models::ProfileStore::default()
+            });
             let (language, mode, start_minimized) = (
                 settings.language.clone(),
                 settings.mode,

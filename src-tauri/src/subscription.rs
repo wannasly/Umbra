@@ -511,16 +511,24 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
         let mut transports: HashMap<String, usize> = HashMap::new();
         let mut securities: HashMap<String, usize> = HashMap::new();
         for s in &got.servers {
-            let t = match &s.transport {
-                crate::models::Transport::Tcp => "tcp".to_string(),
-                crate::models::Transport::Ws { .. } => "ws".to_string(),
-                crate::models::Transport::Grpc { .. } => "grpc".to_string(),
-                crate::models::Transport::Httpupgrade { .. } => "httpupgrade".to_string(),
-            };
-            *transports.entry(t).or_default() += 1;
-            *securities
-                .entry(format!("{:?}", s.security).to_lowercase())
-                .or_default() += 1;
+            match &s.kind {
+                crate::models::ProxyKind::Vless(v) => {
+                    let t = match &v.transport {
+                        crate::models::Transport::Tcp => "tcp".to_string(),
+                        crate::models::Transport::Ws { .. } => "ws".to_string(),
+                        crate::models::Transport::Grpc { .. } => "grpc".to_string(),
+                        crate::models::Transport::Httpupgrade { .. } => "httpupgrade".to_string(),
+                    };
+                    *transports.entry(t).or_default() += 1;
+                    *securities
+                        .entry(format!("{:?}", v.security).to_lowercase())
+                        .or_default() += 1;
+                }
+                crate::models::ProxyKind::Hysteria2(_) => {
+                    *transports.entry("udp".to_string()).or_default() += 1;
+                    *securities.entry("tls".to_string()).or_default() += 1;
+                }
+            }
         }
         println!("parsed:   {} server(s)", got.servers.len());
         println!("skipped:  {} link(s)", got.errors.len());
@@ -529,10 +537,20 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
         println!("quota: {:?}", got.quota);
         println!("filename: {:?}", got.filename);
         for s in &got.servers {
-            println!(
-                "  OK  {:<28} {}:{} flow={:?} sni={:?} sid={:?} fp={:?}",
-                s.name, s.server, s.port, s.flow, s.sni, s.short_id, s.fingerprint
-            );
+            match &s.kind {
+                crate::models::ProxyKind::Vless(v) => {
+                    println!(
+                        "  OK  {:<28} {}:{} flow={:?} sni={:?} sid={:?} fp={:?}",
+                        s.name, s.server, s.port, v.flow, v.sni, v.short_id, v.fingerprint
+                    );
+                }
+                crate::models::ProxyKind::Hysteria2(h) => {
+                    println!(
+                        "  OK Hysteria2 {:<28} {}:{} sni={:?}",
+                        s.name, s.server, s.port, h.sni
+                    );
+                }
+            }
         }
         for e in &got.errors {
             println!("  ERR {e}");

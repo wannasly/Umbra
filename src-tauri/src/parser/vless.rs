@@ -9,13 +9,13 @@ use url::Url;
 
 use super::LinkParser;
 use crate::error::{AppError, AppResult};
-use crate::models::{Security, ServerEntry, Transport};
+use crate::models::{ProxyNode, Security, ServerEntry, Transport};
 
 pub struct VlessParser;
 
 impl LinkParser for VlessParser {
-    fn scheme(&self) -> &str {
-        "vless"
+    fn can_parse(&self, uri: &str) -> bool {
+        uri.to_ascii_lowercase().starts_with("vless://")
     }
 
     fn parse(&self, uri: &str) -> AppResult<ServerEntry> {
@@ -191,51 +191,55 @@ fn parse_vless(uri: &str) -> AppResult<ServerEntry> {
         .filter(|n| !n.trim().is_empty())
         .unwrap_or_else(|| format!("{server}:{port}"));
 
-    Ok(ServerEntry {
+    Ok(ProxyNode {
         id: uuid::Uuid::new_v4().to_string(),
         name,
-        protocol: "vless".into(),
         server,
         port,
-        uuid,
-        flow,
-        security,
-        sni,
-        fingerprint,
-        public_key,
-        short_id,
-        insecure,
-        alpn,
-        transport,
         last_ping_ms: None,
         favorite: false,
         total_up: 0,
         total_down: 0,
         raw: uri.to_string(),
+        kind: crate::models::ProxyKind::Vless(crate::models::VlessNode {
+            uuid,
+            flow,
+            security,
+            sni,
+            fingerprint,
+            public_key,
+            short_id,
+            insecure,
+            alpn,
+            transport,
+        }),
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::ProxyKind;
 
     #[test]
     fn reality_vision_tcp_with_cyrillic_remark() {
         let uri = "vless://b831381d-6324-4d53-ad4f-8cda48b30811@example.com:443?security=reality&sni=yahoo.com&fp=firefox&pbk=SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc&sid=6ba85179&flow=xtls-rprx-vision&type=tcp#%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%20%F0%9F%9A%80";
         let s = parse_vless(uri).unwrap();
         assert_eq!(s.name, "Москва 🚀");
-        assert_eq!(s.protocol, "vless");
-        assert_eq!(s.uuid, "b831381d-6324-4d53-ad4f-8cda48b30811");
         assert_eq!(s.server, "example.com");
         assert_eq!(s.port, 443);
-        assert_eq!(s.security, Security::Reality);
-        assert_eq!(s.sni, "yahoo.com");
-        assert_eq!(s.fingerprint, "firefox");
-        assert_eq!(s.public_key, "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc");
-        assert_eq!(s.short_id, "6ba85179");
-        assert_eq!(s.flow, "xtls-rprx-vision");
-        assert_eq!(s.transport, Transport::Tcp);
-        assert!(s.alpn.is_empty());
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v.uuid, "b831381d-6324-4d53-ad4f-8cda48b30811");
+        assert_eq!(v.security, Security::Reality);
+        assert_eq!(v.sni, "yahoo.com");
+        assert_eq!(v.fingerprint, "firefox");
+        assert_eq!(v.public_key, "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc");
+        assert_eq!(v.short_id, "6ba85179");
+        assert_eq!(v.flow, "xtls-rprx-vision");
+        assert_eq!(v.transport, Transport::Tcp);
+        assert!(v.alpn.is_empty());
         assert_eq!(s.raw, uri);
     }
 
@@ -243,18 +247,21 @@ mod tests {
     fn ws_tls_with_encoded_path_and_ed() {
         let uri = "vless://u1@host.com:8443?security=tls&type=ws&path=%2Fchat%3Fed%3D2048&host=cdn.example.org&alpn=h2,http/1.1&allowInsecure=1";
         let s = parse_vless(uri).unwrap();
-        assert_eq!(s.security, Security::Tls);
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v.security, Security::Tls);
         assert_eq!(
-            s.transport,
+            v.transport,
             Transport::Ws {
                 path: "/chat".into(),
                 host: "cdn.example.org".into()
             }
         );
         // sni falls back to the host param
-        assert_eq!(s.sni, "cdn.example.org");
-        assert_eq!(s.alpn, vec!["h2".to_string(), "http/1.1".to_string()]);
-        assert!(s.insecure);
+        assert_eq!(v.sni, "cdn.example.org");
+        assert_eq!(v.alpn, vec!["h2".to_string(), "http/1.1".to_string()]);
+        assert!(v.insecure);
         // no fragment -> host:port
         assert_eq!(s.name, "host.com:8443");
     }
@@ -263,13 +270,16 @@ mod tests {
     fn grpc_with_service_name() {
         let uri = "vless://u1@h.com:2053?security=tls&type=grpc&serviceName=my%2Fgrpc&sni=cdn.com";
         let s = parse_vless(uri).unwrap();
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
         assert_eq!(
-            s.transport,
+            v.transport,
             Transport::Grpc {
                 service_name: "my/grpc".into()
             }
         );
-        assert_eq!(s.sni, "cdn.com");
+        assert_eq!(v.sni, "cdn.com");
     }
 
     #[test]
@@ -278,8 +288,11 @@ mod tests {
         let s = parse_vless(uri).unwrap();
         assert_eq!(s.server, "2001:db8::1");
         assert_eq!(s.port, 443);
-        assert_eq!(s.security, Security::None);
-        assert_eq!(s.sni, "");
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v.security, Security::None);
+        assert_eq!(v.sni, "");
         assert_eq!(s.name, "v6");
     }
 
@@ -301,16 +314,22 @@ mod tests {
     fn alpn_dropped_for_reality() {
         let uri = "vless://u1@h.com:443?security=reality&pbk=xyz&alpn=h2%2Chttp%2F1.1&type=tcp";
         let s = parse_vless(uri).unwrap();
-        assert!(s.alpn.is_empty());
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
+        assert!(v.alpn.is_empty());
     }
 
     #[test]
     fn flow_dropped_for_ws() {
         let uri = "vless://u1@h.com:443?security=tls&type=ws&flow=xtls-rprx-vision&path=/x";
         let s = parse_vless(uri).unwrap();
-        assert_eq!(s.flow, "");
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v.flow, "");
         assert_eq!(
-            s.transport,
+            v.transport,
             Transport::Ws {
                 path: "/x".into(),
                 host: String::new()
@@ -329,9 +348,12 @@ mod tests {
     fn pbk_verbatim_plus_kept_and_fp_defaults_to_chrome() {
         let uri = "vless://u1@h.com:443?security=reality&pbk=abc+def%2F&type=tcp";
         let s = parse_vless(uri).unwrap();
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
         // + not treated as space, %2F not decoded
-        assert_eq!(s.public_key, "abc+def%2F");
-        assert_eq!(s.fingerprint, "chrome");
+        assert_eq!(v.public_key, "abc+def%2F");
+        assert_eq!(v.fingerprint, "chrome");
     }
 
     /// sing-box has no xhttp/SplitHTTP transport, so such links must be
@@ -360,7 +382,10 @@ mod tests {
         for ty in ["XHTTP", "garbage", "h2", "http", "quic", "kcp"] {
             let uri = format!("vless://u1@h.com:443?security=tls&type={ty}#N");
             let err = parse_vless(&uri)
-                .map(|s| s.transport)
+                .map(|s| match s.kind {
+                    ProxyKind::Vless(v) => v.transport,
+                    _ => panic!(),
+                })
                 .expect_err(&format!("type={ty} must not parse"));
             assert_eq!(err.code(), "UNSUPPORTED_FORMAT", "type={ty}");
             assert!(err.to_string().contains(&ty.to_ascii_lowercase()), "{err}");
@@ -370,8 +395,11 @@ mod tests {
     #[test]
     fn transport_type_matching_is_case_insensitive() {
         let s = parse_vless("vless://u1@h.com:443?security=tls&type=WS&path=/x").unwrap();
+        let ProxyKind::Vless(v) = s.kind else {
+            panic!("not vless")
+        };
         assert_eq!(
-            s.transport,
+            v.transport,
             Transport::Ws {
                 path: "/x".into(),
                 host: String::new()
@@ -382,8 +410,14 @@ mod tests {
     #[test]
     fn sni_falls_back_to_server_domain_but_not_ip() {
         let s = parse_vless("vless://u1@example.org:443?security=tls").unwrap();
-        assert_eq!(s.sni, "example.org");
+        let ProxyKind::Vless(v1) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v1.sni, "example.org");
         let s = parse_vless("vless://u1@1.2.3.4:443?security=tls").unwrap();
-        assert_eq!(s.sni, "");
+        let ProxyKind::Vless(v2) = s.kind else {
+            panic!("not vless")
+        };
+        assert_eq!(v2.sni, "");
     }
 }

@@ -98,3 +98,32 @@ export function splitGroup(entries: ServerEntry[], sort: ServerSort): GroupConte
   for (const entry of entries) (isInfoEntry(entry) ? info : servers).push(entry);
   return { info, servers: sortServers(servers, sort) };
 }
+
+export interface ServerChip {
+  label: string;
+  variant?: string;
+}
+
+export function getProxyChips(s: ServerEntry): ServerChip[] {
+  const chips: ServerChip[] = [];
+  if (s.protocol === "vless") {
+    chips.push({ label: "VLESS" });
+    if (s.security === "reality") {
+      chips.push({ label: "REALITY" });
+    } else if (s.security === "tls") {
+      chips.push({ label: "TLS" });
+    }
+    if (s.flow) {
+      chips.push({ label: s.flow });
+    }
+    if (s.transport.type !== "tcp") {
+      chips.push({ label: s.transport.type.toUpperCase() });
+    }
+  } else if (s.protocol === "hysteria2") {
+    chips.push({ label: "HY2" });
+    if (s.obfs) {
+      chips.push({ label: s.obfs.type.toUpperCase() });
+    }
+  }
+  return chips;
+}

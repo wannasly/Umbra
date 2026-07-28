@@ -38,12 +38,25 @@ export type Transport =
 
 export type Security = "reality" | "tls" | "none";
 
-export interface ServerEntry {
+export type Hysteria2Obfs = {
+  type: "salamander";
+  password: string;
+};
+
+export interface BaseProxyNode {
   id: string;
   name: string;
-  protocol: "vless";
   server: string;
   port: number;
+  lastPingMs: number | null;
+  favorite: boolean;
+  totalUp?: number;
+  totalDown?: number;
+  raw: string;
+}
+
+export interface ProxyNodeVless extends BaseProxyNode {
+  protocol: "vless";
   uuid: string;
   flow: string;
   security: Security;
@@ -54,25 +67,19 @@ export interface ServerEntry {
   insecure: boolean;
   alpn: string[];
   transport: Transport;
-  lastPingMs: number | null;
-  /**
-   * Starred by the user. Favourites are pinned above every group on the Servers
-   * page. Persisted on the entry itself, so a subscription refresh keeps it
-   * (the backend's merge carries it over like lastPingMs).
-   */
-  favorite: boolean;
-  /**
-   * Bytes ever moved through this specific server, accumulated across sessions
-   * and persisted by the backend — not the current session's counters, which
-   * live on TrafficStats. Optional because the backend gained them after the
-   * UI did: treat `undefined` as "not tracked yet" and render a placeholder
-   * rather than a zero, which would read as "this server has never been used".
-   */
-  totalUp?: number;
-  totalDown?: number;
-  /** original share link, for "Copy link" */
-  raw: string;
 }
+
+export interface ProxyNodeHysteria2 extends BaseProxyNode {
+  protocol: "hysteria2";
+  password: string;
+  obfs?: Hysteria2Obfs;
+  insecure: boolean;
+  sni: string;
+  alpn: string[];
+}
+
+export type ProxyNode = ProxyNodeVless | ProxyNodeHysteria2;
+export type ServerEntry = ProxyNode;
 
 export interface SubscriptionQuota {
   upload: number;

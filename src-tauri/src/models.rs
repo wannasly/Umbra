@@ -122,15 +122,15 @@ pub enum Security {
     None,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Hysteria2Obfs {
+    Salamander { password: String },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ServerEntry {
-    pub id: String,
-    pub name: String,
-    /// always "vless" for now; extensible later
-    pub protocol: String,
-    pub server: String,
-    pub port: u16,
+pub struct VlessNode {
     pub uuid: String,
     #[serde(default)]
     pub flow: String,
@@ -149,23 +149,59 @@ pub struct ServerEntry {
     pub alpn: Vec<String>,
     #[serde(default)]
     pub transport: Transport,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Hysteria2Node {
+    pub password: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub obfs: Option<Hysteria2Obfs>,
+    #[serde(default)]
+    pub insecure: bool,
+    #[serde(default)]
+    pub sni: String,
+    #[serde(default)]
+    pub alpn: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    tag = "protocol",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub enum ProxyKind {
+    #[serde(rename = "vless")]
+    Vless(VlessNode),
+    #[serde(rename = "hysteria2")]
+    Hysteria2(Hysteria2Node),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyNode {
+    pub id: String,
+    pub name: String,
+    pub server: String,
+    pub port: u16,
+
     #[serde(default)]
     pub last_ping_ms: Option<u32>,
-    /// Pinned to the top of the server list. Survives a subscription refresh
-    /// (see `subscription::merge_servers`): a star the panel can wipe on every
-    /// update would be worse than no star at all.
     #[serde(default)]
     pub favorite: bool,
-    /// Cumulative bytes sent through this server across all sessions.
     #[serde(default)]
     pub total_up: u64,
-    /// Cumulative bytes received through this server across all sessions.
     #[serde(default)]
     pub total_down: u64,
-    /// original share link
     #[serde(default)]
     pub raw: String,
+
+    #[serde(flatten)]
+    pub kind: ProxyKind,
 }
+
+pub type ServerEntry = ProxyNode;
 
 // ---------------------------------------------------------------------------
 // Subscriptions
@@ -204,7 +240,7 @@ pub struct Subscription {
     #[serde(default)]
     pub panel_title: Option<String>,
     #[serde(default)]
-    pub servers: Vec<ServerEntry>,
+    pub servers: Vec<ProxyNode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -213,13 +249,13 @@ pub struct ProfileStore {
     #[serde(default = "default_store_version")]
     pub version: u32,
     #[serde(default)]
-    pub manual: Vec<ServerEntry>,
+    pub manual: Vec<ProxyNode>,
     #[serde(default)]
     pub subscriptions: Vec<Subscription>,
 }
 
 fn default_store_version() -> u32 {
-    1
+    2
 }
 
 impl Default for ProfileStore {
@@ -406,4 +442,80 @@ pub struct ImportResult {
 pub struct ServersList {
     pub manual: Vec<ServerEntry>,
     pub subscriptions: Vec<Subscription>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn proxy_node_vless_serializes_flat() {
+        let node = ProxyNode {
+            id: "1".into(),
+            name: "test-vless".into(),
+            server: "1.2.3.4".into(),
+            port: 443,
+            last_ping_ms: None,
+            favorite: false,
+            total_up: 0,
+            total_down: 0,
+            raw: "vless://...".into(),
+            kind: ProxyKind::Vless(VlessNode {
+                uuid: "uuid-123".into(),
+                flow: "xtls-rprx-vision".into(),
+                security: Security::Reality,
+                sni: "example.com".into(),
+                fingerprint: "chrome".into(),
+                public_key: "pbk123".into(),
+                short_id: "sid123".into(),
+                insecure: false,
+                alpn: vec![],
+                transport: Transport::Tcp,
+            }),
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        assert_eq!(val["id"], "1");
+        assert_eq!(val["name"], "test-vless");
+        assert_eq!(val["protocol"], "vless");
+        assert_eq!(val["uuid"], "uuid-123");
+        assert_eq!(val["publicKey"], "pbk123");
+        assert_eq!(val["shortId"], "sid123");
+        assert!(val.get("kind").is_none());
+    }
+
+    #[test]
+    fn proxy_node_hysteria2_serializes_flat() {
+        let node = ProxyNode {
+            id: "2".into(),
+            name: "test-hy2".into(),
+            server: "5.6.7.8".into(),
+            port: 443,
+            last_ping_ms: None,
+            favorite: true,
+            total_up: 100,
+            total_down: 200,
+            raw: "hy2://...".into(),
+            kind: ProxyKind::Hysteria2(Hysteria2Node {
+                password: "secret_password".into(),
+                obfs: Some(Hysteria2Obfs::Salamander {
+                    password: "obfs_pass".into(),
+                }),
+                insecure: true,
+                sni: "hy2.example.com".into(),
+                alpn: vec!["h3".into()],
+            }),
+        };
+        let val = serde_json::to_value(&node).unwrap();
+        assert_eq!(val["id"], "2");
+        assert_eq!(val["protocol"], "hysteria2");
+        assert_eq!(val["password"], "secret_password");
+        assert_eq!(
+            val["obfs"],
+            json!({ "type": "salamander", "password": "obfs_pass" })
+        );
+        assert_eq!(val["insecure"], true);
+        assert_eq!(val["sni"], "hy2.example.com");
+        assert!(val.get("kind").is_none());
+    }
 }
