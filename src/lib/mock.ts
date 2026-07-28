@@ -4,6 +4,7 @@
 import type {
   ConnectionState,
   LogLine,
+  ProxyNodeVless,
   ServerEntry,
   ServersList,
   Settings,
@@ -19,7 +20,7 @@ function server(
   id: string,
   name: string,
   host: string,
-  extra: Partial<ServerEntry> = {},
+  extra: Partial<ProxyNodeVless> = {},
 ): ServerEntry {
   return {
     id,
@@ -47,6 +48,22 @@ function server(
 }
 
 const mockServers: ServerEntry[] = [
+  {
+    id: "srv-hy2",
+    name: "🇫🇮 Helsinki HY2",
+    protocol: "hysteria2",
+    server: "fi.example.com",
+    port: 443,
+    password: "mockpassword",
+    insecure: false,
+    sni: "fi.example.com",
+    alpn: ["h3"],
+    lastPingMs: 38,
+    favorite: false,
+    totalUp: 500_000,
+    totalDown: 12_000_000,
+    raw: "hy2://mockpassword@fi.example.com:443#%D0%A4%D0%B8%D0%BD%D0%BB%D1%8F%D0%BD%D0%B4%D0%B8%D1%8F%20HY2",
+  },
   server("srv-1", "🇳🇱 Amsterdam-1", "nl1.example.com", {
     lastPingMs: 43,
     favorite: true,

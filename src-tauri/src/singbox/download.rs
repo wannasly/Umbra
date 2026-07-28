@@ -15,7 +15,7 @@ use crate::models::UpdateCheck;
 use crate::singbox::version::{core_path, probe_version};
 use crate::state::AppState;
 
-const API_LATEST: &str = "https://api.github.com/repos/SagerNet/sing-box/releases/latest";
+const API_RELEASES: &str = "https://api.github.com/repos/SagerNet/sing-box/releases?per_page=30";
 const API_TAG: &str = "https://api.github.com/repos/SagerNet/sing-box/releases/tags";
 const PROGRESS_STEP: u64 = 256 * 1024;
 
@@ -98,41 +98,78 @@ fn gh_client() -> AppResult<reqwest::Client> {
 }
 
 async fn fetch_release(client: &reqwest::Client, tag: Option<&str>) -> AppResult<ReleaseInfo> {
-    let url = match tag {
-        Some(t) => format!("{API_TAG}/{t}"),
-        None => API_LATEST.to_string(),
-    };
+    if let Some(t) = tag {
+        let clean_v = t.trim().trim_start_matches('v');
+        if !crate::singbox::version::is_version_compatible(clean_v) {
+            return Err(AppError::Unsupported(format!(
+                "version '{t}' is incompatible with Umbra (requires sing-box 1.13.x)"
+            )));
+        }
+        let url = format!("{API_TAG}/{t}");
+        let resp = client
+            .get(&url)
+            .timeout(Duration::from_secs(20))
+            .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .send()
+            .await?;
+        let status = resp.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            return Err(AppError::NotFound(format!("sing-box release {t}")));
+        }
+        if !status.is_success() {
+            return Err(AppError::Network(format!(
+                "GitHub API returned HTTP {status}"
+            )));
+        }
+        let release: GhRelease = resp.json().await?;
+        let (version, asset) = release
+            .assets
+            .iter()
+            .find_map(|a| asset_version(&a.name).map(|v| (v.to_string(), a)))
+            .ok_or_else(|| AppError::NotFound("windows-amd64 asset in sing-box release".into()))?;
+        return Ok(ReleaseInfo {
+            version,
+            url: asset.browser_download_url.clone(),
+            size: asset.size,
+            sha256: asset.digest.as_deref().and_then(digest_to_hex),
+        });
+    }
+
+    // Iterate releases to find latest 1.13.x release
     let resp = client
-        .get(&url)
+        .get(API_RELEASES)
         .timeout(Duration::from_secs(20))
         .header(reqwest::header::ACCEPT, "application/vnd.github+json")
         .header("X-GitHub-Api-Version", "2022-11-28")
         .send()
         .await?;
-    let status = resp.status();
-    if status == reqwest::StatusCode::NOT_FOUND {
-        return Err(AppError::NotFound(format!(
-            "sing-box release {}",
-            tag.unwrap_or("latest")
-        )));
-    }
-    if !status.is_success() {
+    if !resp.status().is_success() {
         return Err(AppError::Network(format!(
-            "GitHub API returned HTTP {status}"
+            "GitHub API returned HTTP {}",
+            resp.status()
         )));
     }
-    let release: GhRelease = resp.json().await?;
-    let (version, asset) = release
-        .assets
-        .iter()
-        .find_map(|a| asset_version(&a.name).map(|v| (v.to_string(), a)))
-        .ok_or_else(|| AppError::NotFound("windows-amd64 asset in sing-box release".into()))?;
-    Ok(ReleaseInfo {
-        version,
-        url: asset.browser_download_url.clone(),
-        size: asset.size,
-        sha256: asset.digest.as_deref().and_then(digest_to_hex),
-    })
+    let releases: Vec<GhRelease> = resp.json().await?;
+    for release in releases {
+        if let Some((version, asset)) = release
+            .assets
+            .iter()
+            .find_map(|a| asset_version(&a.name).map(|v| (v.to_string(), a)))
+        {
+            if crate::singbox::version::is_version_compatible(&version) {
+                return Ok(ReleaseInfo {
+                    version,
+                    url: asset.browser_download_url.clone(),
+                    size: asset.size,
+                    sha256: asset.digest.as_deref().and_then(digest_to_hex),
+                });
+            }
+        }
+    }
+    Err(AppError::NotFound(
+        "no compatible sing-box 1.13.x release found".into(),
+    ))
 }
 
 /// Latest release, cached for the session (unauthenticated limit: 60 req/h).

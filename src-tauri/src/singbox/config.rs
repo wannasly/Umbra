@@ -726,4 +726,52 @@ mod tests {
         assert_eq!(cfg.clash_port, 9090);
         assert_eq!(cfg.clash_secret, "s3cret");
     }
+
+    #[test]
+    fn test_singbox_check_hysteria2() {
+        use std::path::Path;
+        let hy2_node = ProxyNode {
+            id: "hy2-1".into(),
+            name: "Hysteria2 Test".into(),
+            server: "1.1.1.1".into(),
+            port: 443,
+            last_ping_ms: None,
+            favorite: false,
+            total_up: 0,
+            total_down: 0,
+            raw: "".into(),
+            kind: ProxyKind::Hysteria2(crate::models::Hysteria2Node {
+                password: "testpass".into(),
+                obfs: Some(crate::models::Hysteria2Obfs::Salamander {
+                    password: "obfspass".into(),
+                }),
+                insecure: false,
+                sni: "example.com".into(),
+                alpn: vec!["h3".into()],
+            }),
+        };
+        let servers = vec![hy2_node];
+        let refs: Vec<&ProxyNode> = servers.iter().collect();
+        let cfg = generate(&Settings::default(), &refs, "hy2-1", 9090, "secret").unwrap();
+
+        let candidate_paths = [
+            Path::new("resources/sing-box.exe"),
+            Path::new("src-tauri/resources/sing-box.exe"),
+            Path::new("../resources/sing-box.exe"),
+        ];
+        if let Some(core) = candidate_paths.iter().find(|p| p.exists()) {
+            let tmp_dir = std::env::temp_dir();
+            let cfg_path = tmp_dir.join("test_hy2_cfg.json");
+            std::fs::write(&cfg_path, cfg.json.to_string()).unwrap();
+            let mut cmd = std::process::Command::new(core);
+            cmd.arg("check").arg("-c").arg(&cfg_path);
+            let out = cmd.output().expect("failed to execute sing-box check");
+            assert!(
+                out.status.success(),
+                "sing-box check failed for Hysteria2: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let _ = std::fs::remove_file(&cfg_path);
+        }
+    }
 }

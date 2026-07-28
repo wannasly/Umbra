@@ -14,8 +14,8 @@ use crate::models::{ProxyNode, Security, ServerEntry, Transport};
 pub struct VlessParser;
 
 impl LinkParser for VlessParser {
-    fn scheme(&self) -> &str {
-        "vless"
+    fn can_parse(&self, uri: &str) -> bool {
+        uri.to_ascii_lowercase().starts_with("vless://")
     }
 
     fn parse(&self, uri: &str) -> AppResult<ServerEntry> {

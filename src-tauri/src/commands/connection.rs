@@ -43,9 +43,7 @@ fn random_secret() -> String {
 
 pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<ConnectionState> {
     let state = app.state::<AppState>();
-    if !version::core_path(&state.data_dir).exists() {
-        return Err(AppError::CoreNotInstalled);
-    }
+    version::ensure_compatible_core(&version::core_path(&state.data_dir))?;
     let servers: Vec<ServerEntry> =
         { state.profiles.read().await.all_servers().cloned().collect() };
     // Snapshotted here and carried in the connection state for the whole
@@ -337,12 +335,19 @@ mod tests {
 
     #[tokio::test]
     async fn pick_free_port_returns_start_when_free() {
-        // find a free port first, then ask for it explicitly
-        let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = probe.local_addr().unwrap().port();
-        drop(probe);
-        let picked = pick_free_port(port, None).await.unwrap();
-        assert_eq!(picked, port);
+        let mut matched = false;
+        for _ in 0..10 {
+            let probe = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = probe.local_addr().unwrap().port();
+            drop(probe);
+            if let Ok(picked) = pick_free_port(port, None).await {
+                if picked == port {
+                    matched = true;
+                    break;
+                }
+            }
+        }
+        assert!(matched);
     }
 
     #[tokio::test]

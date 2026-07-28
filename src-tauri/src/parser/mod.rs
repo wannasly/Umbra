@@ -1,5 +1,6 @@
 //! Share-link parsing: scheme dispatch + bulk import helper.
 
+pub mod hysteria2;
 pub mod vless;
 
 use std::collections::HashSet;
@@ -10,19 +11,16 @@ use crate::error::{AppError, AppResult};
 use crate::models::ServerEntry;
 
 pub trait LinkParser {
-    fn scheme(&self) -> &str;
+    fn can_parse(&self, uri: &str) -> bool;
     fn parse(&self, uri: &str) -> AppResult<ServerEntry>;
 }
 
 /// Dispatch a single share link by its scheme prefix.
 pub fn parse_any(uri: &str) -> AppResult<ServerEntry> {
-    let parsers: [&dyn LinkParser; 1] = [&vless::VlessParser];
+    let parsers: [&dyn LinkParser; 2] = [&vless::VlessParser, &hysteria2::Hysteria2Parser];
     for parser in parsers {
-        let scheme = parser.scheme();
-        if let Some(prefix) = uri.get(..scheme.len()) {
-            if prefix.eq_ignore_ascii_case(scheme) && uri[scheme.len()..].starts_with("://") {
-                return parser.parse(uri);
-            }
+        if parser.can_parse(uri) {
+            return parser.parse(uri);
         }
     }
     let scheme = uri.split("://").next().unwrap_or(uri);

@@ -67,7 +67,15 @@ function AddServersModal({
   const pushToast = useUi((s) => s.toast);
 
   const parsedCount = useMemo(
-    () => text.split(/\s+/).filter((line) => line.startsWith("vless://")).length,
+    () =>
+      text
+        .split(/\s+/)
+        .filter(
+          (line) =>
+            line.toLowerCase().startsWith("vless://") ||
+            line.toLowerCase().startsWith("hysteria2://") ||
+            line.toLowerCase().startsWith("hy2://"),
+        ).length,
     [text],
   );
 

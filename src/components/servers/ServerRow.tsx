@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { ArrowDown, ArrowUp, Copy, Star, Trash2, Zap } from "lucide-react";
 import type { ServerEntry } from "../../lib/ipc";
 import { readServerName } from "../../lib/flags";
+import { getProxyChips } from "../../lib/serverMeta";
 import { formatBytes } from "../../lib/format";
 import { cn } from "../../lib/cn";
 import { GlassCard } from "../ui/GlassCard";
@@ -46,11 +47,7 @@ export function ServerRow({
 }: ServerRowProps) {
   const { t } = useTranslation();
   const { flag, label } = readServerName(server.name);
-  const chips = [
-    server.protocol.toUpperCase(),
-    server.security !== "none" ? server.security.toUpperCase() : null,
-    server.transport.type !== "tcp" ? server.transport.type.toUpperCase() : null,
-  ].filter((c): c is string => c !== null);
+  const chips = getProxyChips(server);
 
   const used = (server.totalUp ?? 0) + (server.totalDown ?? 0);
 
@@ -89,10 +86,10 @@ export function ServerRow({
             <span className="flex shrink-0 items-center gap-1">
               {chips.map((c) => (
                 <span
-                  key={c}
+                  key={c.label}
                   className="rounded-(--radius-chip) border border-glass-border bg-glass px-2 py-0.5 text-xs font-medium text-text-dim"
                 >
-                  {c}
+                  {c.label}
                 </span>
               ))}
             </span>
