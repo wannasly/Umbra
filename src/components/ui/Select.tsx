@@ -33,11 +33,14 @@ export function Select<T extends string>({
         ref={triggerRef}
         type="button"
         disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "flex h-8 w-full items-center justify-between gap-2 rounded-(--radius-ctl) border border-glass-border bg-glass px-3 text-[13px] text-text",
-          "transition-[background-color,border-color] duration-150 hover:bg-glass-strong",
-          "disabled:pointer-events-none disabled:opacity-45",
+          "flex h-9 w-full items-center justify-between gap-2 rounded-(--radius-ctl) border border-interactive-border bg-surface-2/55 px-3 text-[13px] text-text outline-none",
+          "transition-[background-color,border-color,box-shadow] duration-150 hover:border-interactive-border-hover hover:bg-hover-surface",
+          "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
+          "disabled:pointer-events-none disabled:opacity-60",
         )}
       >
         <span className="truncate">{current?.label ?? ""}</span>
@@ -60,7 +63,7 @@ export function Select<T extends string>({
             }}
             className={cn(
               "flex w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-[13px] whitespace-nowrap",
-              "transition-colors duration-100 hover:bg-glass-strong",
+              "outline-none transition-colors duration-100 hover:bg-hover-surface focus-visible:bg-hover-surface focus-visible:text-text",
               o.value === value ? "text-text" : "text-text-dim",
             )}
           >

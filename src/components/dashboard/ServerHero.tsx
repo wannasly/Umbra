@@ -54,9 +54,10 @@ function PingReadout({ server }: { server: ServerEntry }) {
         aria-label={t("dashboard.ping.refresh")}
         className={cn(
           "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-(--radius-ctl)",
-          "border border-glass-border bg-glass text-text-dim",
-          "transition-[background-color,color] duration-150",
-          "hover:bg-glass-strong hover:text-text disabled:pointer-events-none disabled:opacity-45",
+          "border border-interactive-border bg-surface-2/55 text-text-dim outline-none",
+          "transition-[background-color,border-color,color,box-shadow] duration-150",
+          "hover:border-interactive-border-hover hover:bg-hover-surface hover:text-text disabled:pointer-events-none disabled:opacity-60",
+          "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
         )}
       >
         <RefreshCw size={16} className={cn(testing && "animate-spin")} />
@@ -81,7 +82,7 @@ function ServerTotal({ server }: { server: ServerEntry }) {
     <div
       className={cn(
         "flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-(--radius-ctl)",
-        "border border-glass-border bg-glass px-3.5 py-2.5",
+        "border border-glass-border bg-surface-2/35 px-3.5 py-2",
       )}
     >
       <span className="text-label font-semibold text-text-faint uppercase">
@@ -189,8 +190,9 @@ export function ServerHero({
           type="button"
           onClick={onChoose}
           className={cn(
-            "ml-auto inline-flex shrink-0 items-center gap-1.5 rounded-(--radius-chip) px-2.5 py-1",
-            "text-xs font-semibold text-text-dim transition-colors duration-150 hover:bg-glass hover:text-text",
+            "ml-auto inline-flex h-9 shrink-0 items-center gap-1.5 rounded-(--radius-chip) px-2.5",
+            "text-xs font-semibold text-text-dim outline-none transition-colors duration-150 hover:bg-hover-surface hover:text-text",
+            "focus-visible:ring-2 focus-visible:ring-focus-ring",
           )}
         >
           <Repeat size={13} />

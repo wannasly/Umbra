@@ -10,11 +10,12 @@ export function IconButton({ danger, className, ...rest }: IconButtonProps) {
     <button
       type="button"
       className={cn(
-        "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-(--radius-ctl) text-text-dim",
-        "transition-[background-color,color] duration-150 disabled:pointer-events-none disabled:opacity-45",
+        "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-(--radius-ctl) text-text-dim outline-none",
+        "transition-[background-color,border-color,color,transform] duration-150 active:scale-95 disabled:pointer-events-none disabled:opacity-60",
+        "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
         danger
           ? "hover:bg-danger/15 hover:text-danger"
-          : "hover:bg-glass-strong hover:text-text",
+          : "hover:bg-hover-surface hover:text-text",
         className,
       )}
       {...rest}

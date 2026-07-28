@@ -75,7 +75,7 @@ export function ToastHost() {
                 <button
                   type="button"
                   onClick={() => dismiss(t.id)}
-                  className="shrink-0 rounded p-0.5 text-text-faint transition-colors hover:text-text"
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-(--radius-ctl) text-text-faint outline-none transition-colors hover:bg-hover-surface hover:text-text focus-visible:ring-2 focus-visible:ring-focus-ring"
                 >
                   <X size={13} />
                 </button>

@@ -78,7 +78,7 @@ export function Titlebar() {
   };
 
   const btn =
-    "flex h-8 w-11 items-center justify-center text-text-dim transition-[background-color,color] duration-150 rounded-lg";
+    "flex h-9 w-11 items-center justify-center rounded-lg text-text-dim outline-none transition-[background-color,color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring";
 
   return (
     <header

@@ -38,7 +38,7 @@ export function ConnectButton({ status, onClick }: ConnectButtonProps) {
 
   return (
     <div
-      className="relative shrink-0"
+      className="dashboard-connect-box relative shrink-0"
       style={{ width: BOX, height: BOX }}
     >
       {/* ripple rings while connected */}
@@ -89,8 +89,9 @@ export function ConnectButton({ status, onClick }: ConnectButtonProps) {
         style={{ borderRadius: "9999px", inset: CORE_INSET }}
         className={cn(
           "glass absolute flex items-center justify-center will-change-transform",
-          "transition-[border-color,box-shadow,filter] duration-500",
-          status === "disconnected" && "border-accent/40",
+          "outline-none transition-[border-color,box-shadow,filter] duration-500",
+          "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
+          status === "disconnected" && "border-interactive-border-hover",
           connecting && "border-warn/30",
           connected && "border-ok/55 bg-ok/8 shadow-(--shadow-glow-ok)",
           stopping && "border-glass-border opacity-70 saturate-50",
@@ -101,7 +102,7 @@ export function ConnectButton({ status, onClick }: ConnectButtonProps) {
           strokeWidth={1.75}
           className={cn(
             "transition-colors duration-500",
-            status === "disconnected" && "text-danger/85",
+            status === "disconnected" && "text-accent/90",
             connecting && "text-warn",
             connected && "text-ok",
             stopping && "text-text-faint",

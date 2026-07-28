@@ -24,9 +24,9 @@ export function TextField({
       )}
       <input
         className={cn(
-          "h-9 w-full rounded-(--radius-ctl) border border-glass-border bg-glass px-3 text-[13px] text-text select-text",
+          "h-9 w-full rounded-(--radius-ctl) border border-interactive-border bg-surface-2/55 px-3 text-[13px] text-text select-text",
           "outline-none placeholder:text-text-faint",
-          "transition-[border-color,box-shadow] duration-150 focus:border-accent/60 focus:ring-2 focus:ring-accent/40",
+          "transition-[border-color,box-shadow] duration-150 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/55",
           icon && "pl-9",
           mono && "font-mono text-xs",
           className,

@@ -88,7 +88,7 @@ export function Popover({
             minWidth: rect.width,
           }}
           className={cn(
-            "z-100 origin-top-right overflow-hidden rounded-(--radius-ctl) border border-glass-border bg-bg-raise py-1 shadow-(--shadow-panel)",
+            "z-100 origin-top-right overflow-hidden rounded-(--radius-ctl) border border-interactive-border bg-surface-2 py-1 shadow-(--shadow-raised)",
             className,
           )}
         >

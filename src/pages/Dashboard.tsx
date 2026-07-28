@@ -28,7 +28,7 @@ function Uptime({ sinceMs }: { sinceMs: number | null }) {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  disconnected: "text-text-faint",
+  disconnected: "text-text-dim",
   connecting: "text-warn",
   connected: "text-ok",
   stopping: "text-text-dim",
@@ -89,7 +89,7 @@ export function Dashboard() {
   const modeLocked = conn.status !== "disconnected";
 
   return (
-    <PageShell width="list" className="gap-4">
+    <PageShell width="list" className="dashboard-shell gap-4">
       {/*
         Hero. Reading order matches the weight the user asked for: the power
         button, then the server name with its latency beside it, then how much
@@ -98,13 +98,16 @@ export function Dashboard() {
         two sit side by side down to ~560px of card width and stack below it
         instead of crushing the name into an ellipsis.
       */}
-      <GlassCard className="px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.875rem,1.45vw,1.25rem)]">
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-5">
+      <GlassCard
+        variant="glass"
+        className="dashboard-hero-card px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.875rem,1.45vw,1.25rem)]"
+      >
+        <div className="dashboard-hero-layout flex flex-wrap items-center gap-x-6 gap-y-5">
           <div className="mx-auto flex shrink-0 flex-col items-center gap-2">
             <ConnectButton status={conn.status} onClick={onHeroClick} />
             <div
               className={cn(
-                "font-display text-status font-extrabold tracking-[0.16em] uppercase",
+                "dashboard-status font-display text-status font-extrabold tracking-[0.08em]",
                 STATUS_COLOR[conn.status],
               )}
             >
@@ -128,7 +131,7 @@ export function Dashboard() {
         layout pushed the control to the far right and left a dead ~260px gap
         between the two.
       */}
-      <div className="glass flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-card) px-4 py-3">
+      <div className="surface-panel flex flex-wrap items-center gap-x-4 gap-y-2 rounded-(--radius-card) px-4 py-2.5">
         <span className="text-label font-semibold text-text-faint uppercase">
           {t("dashboard.mode.label")}
         </span>
@@ -157,8 +160,8 @@ export function Dashboard() {
         instrument panel, with the chart as its baseline. Two columns until the
         window is wide enough for four to keep their numerals un-truncated.
       */}
-      <GlassCard className="px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.875rem,1.45vw,1.25rem)]">
-        <div className="mb-4 grid grid-cols-2 gap-x-6 gap-y-5 min-[840px]:grid-cols-4">
+      <GlassCard className="dashboard-stats-card px-[clamp(1rem,1.8vw,1.5rem)] py-[clamp(0.875rem,1.45vw,1.25rem)]">
+        <div className="dashboard-stats-grid mb-4 grid grid-cols-2 gap-x-6 gap-y-5 min-[840px]:grid-cols-4">
           <StatTile
             tone="down"
             label={t("dashboard.traffic.download")}

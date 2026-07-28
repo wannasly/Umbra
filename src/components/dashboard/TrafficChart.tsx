@@ -129,7 +129,7 @@ export function TrafficChart() {
   return (
     <div
       ref={wrapRef}
-      className="relative h-[clamp(6.5rem,14vh,10rem)] w-full overflow-hidden rounded-(--radius-ctl)"
+      className="dashboard-chart relative h-[clamp(6.5rem,14vh,10rem)] w-full overflow-hidden rounded-(--radius-ctl)"
     >
       {w > 0 && h > 0 && (
         <svg
