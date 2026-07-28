@@ -19,25 +19,47 @@
 */
 
 @theme {
-  /* ---------- Backgrounds (all darker than #003b46) ---------- */
-  --color-bg-deep: #00131a; /* abyss — bottom of the page gradient */
-  --color-bg-base: #002630; /* the app surface */
-  --color-bg-raise: #06414d; /* raised panels, between deep water and ocean */
+  /* ---------- Deep Sea Refined surfaces ---------- */
+  --color-surface-0: #00151d; /* page / abyss */
+  --color-surface-1: #042e38; /* working panels and lists */
+  --color-surface-2: #073b46; /* raised panels and popovers */
+  --color-surface-glass: rgb(7 59 70 / 0.66);
 
-  /* ---------- Glass (sea-foam tinted, not neutral white) ---------- */
-  --color-glass: rgb(196 223 230 / 0.06);
-  --color-glass-strong: rgb(196 223 230 / 0.115);
-  --color-glass-border: rgb(196 223 230 / 0.14);
-  --color-glass-edge: rgb(196 223 230 / 0.2);
+  /* Backwards-compatible aliases used by existing utilities. */
+  --color-bg-deep: var(--color-surface-0);
+  --color-bg-base: #002630;
+  --color-bg-raise: var(--color-surface-2);
+
+  /* Decorative glass stays quiet; controls receive stronger tokens below. */
+  --color-glass: rgb(196 223 230 / 0.065);
+  --color-glass-strong: rgb(196 223 230 / 0.12);
+  --color-glass-border: rgb(196 223 230 / 0.18);
+  --color-glass-edge: rgb(196 223 230 / 0.24);
+
+  /* ---------- Interaction hierarchy ---------- */
+  --color-interactive-border: rgb(196 223 230 / 0.38);
+  --color-interactive-border-hover: rgb(115 213 227 / 0.62);
+  --color-focus-ring: #9aeaf3;
+  --color-hover-surface: #08404b;
+  --color-selected-surface: #0a4652;
+  --color-selected-border: rgb(115 213 227 / 0.72);
 
   /* ---------- Brand / accents ---------- */
-  --color-accent: #66a5ad; /* wave */
-  --color-accent-2: #7ecfda; /* surf spray — the lighter half of every gradient */
+  --color-accent: #73d5e3; /* refined wave */
+  --color-accent-2: #a0e8f0; /* surf spray */
+  --color-accent-violet-from: #73d5e3;
+  --color-accent-violet-to: #a0e8f0;
+  --color-accent-cyan-from: #5ad0e0;
+  --color-accent-cyan-to: #b4edf3;
+  --color-accent-emerald-from: #5c9fd1;
+  --color-accent-emerald-to: #73d5e3;
+  --color-accent-amber-from: #d0e8ec;
+  --color-accent-amber-to: #94c9d2;
 
   /* ---------- Semantics: off-hue on purpose ---------- */
-  --color-ok: #2fe07f; /* connected — spring green, ~40 deg off the wave hue */
+  --color-ok: #42e58e; /* connected — spring green, off the wave hue */
   --color-warn: #f2b544;
-  --color-danger: #f9718a;
+  --color-danger: #ff738f;
 
   /* ---------- Text: sea foam ----------
      Alphas are set by the contrast floor, not by taste. Measured against the
@@ -105,10 +127,11 @@
 
   /* ---------- Effects ---------- */
   --blur-glass: 20px;
-  --shadow-panel: 0 8px 32px rgb(0 8 11 / 0.5);
-  --shadow-glow-ok: 0 0 26px rgb(47 224 127 / 0.34), 0 0 84px rgb(47 224 127 / 0.14);
-  --shadow-glow-accent: 0 0 26px rgb(126 207 218 / 0.38), 0 0 84px rgb(102 165 173 / 0.18);
-  --shadow-glow-danger: 0 0 26px rgb(249 113 138 / 0.34);
+  --shadow-panel: 0 10px 30px rgb(0 8 11 / 0.38);
+  --shadow-raised: 0 14px 38px rgb(0 8 11 / 0.48);
+  --shadow-glow-ok: 0 0 24px rgb(66 229 142 / 0.3), 0 0 72px rgb(66 229 142 / 0.12);
+  --shadow-glow-accent: 0 0 24px rgb(115 213 227 / 0.3), 0 0 72px rgb(115 213 227 / 0.14);
+  --shadow-glow-danger: 0 0 24px rgb(255 115 143 / 0.3);
 }
 
 /*
@@ -123,28 +146,52 @@
 :root[data-accent="cyan"] {
   /* surf */
   --color-accent: #5ad0e0;
-  --color-accent-2: #a9e4ec;
+  --color-accent-2: #b4edf3;
   --shadow-glow-accent: 0 0 26px rgb(90 208 224 / 0.4), 0 0 84px rgb(90 208 224 / 0.18);
 }
 :root[data-accent="emerald"] {
   /* abyss — deeper, bluer water */
-  --color-accent: #4a86b8;
-  --color-accent-2: #66a5ad;
-  --shadow-glow-accent: 0 0 26px rgb(74 134 184 / 0.42), 0 0 84px rgb(74 134 184 / 0.2);
+  --color-accent: #5c9fd1;
+  --color-accent-2: #73d5e3;
+  --shadow-glow-accent: 0 0 26px rgb(92 159 209 / 0.4), 0 0 84px rgb(92 159 209 / 0.18);
 }
 :root[data-accent="amber"] {
   /* foam — near-monochrome, the quiet option */
-  --color-accent: #c4dfe6;
-  --color-accent-2: #8fc2cc;
-  --shadow-glow-accent: 0 0 26px rgb(196 223 230 / 0.3), 0 0 84px rgb(196 223 230 / 0.12);
+  --color-accent: #d0e8ec;
+  --color-accent-2: #94c9d2;
+  --shadow-glow-accent: 0 0 26px rgb(208 232 236 / 0.28), 0 0 84px rgb(208 232 236 / 0.1);
 }
 
 @utility glass {
-  background: var(--color-glass);
+  background: var(--color-surface-glass);
   border: 1px solid var(--color-glass-border);
   border-radius: var(--radius-panel);
   backdrop-filter: blur(var(--blur-glass)) saturate(140%);
   box-shadow: var(--shadow-panel), inset 0 1px 0 var(--color-glass-edge);
+}
+
+@utility surface-panel {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-glass-border);
+  border-radius: var(--radius-panel);
+  box-shadow: 0 8px 24px rgb(0 8 11 / 0.22), inset 0 1px 0 rgb(196 223 230 / 0.05);
+}
+
+@utility surface-raised {
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-interactive-border);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-raised), inset 0 1px 0 var(--color-glass-edge);
+}
+
+@utility focus-control {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+@utility focus-control-visible {
+  outline-color: var(--color-focus-ring);
+  box-shadow: 0 0 0 4px rgb(115 213 227 / 0.18);
 }
 
 html,
@@ -162,10 +209,10 @@ body {
   -webkit-font-smoothing: antialiased;
   user-select: none;
   background:
-    radial-gradient(900px 620px at 12% -12%, rgb(7 87 91 / 0.55), transparent 62%),
-    radial-gradient(760px 540px at 106% 12%, rgb(102 165 173 / 0.2), transparent 58%),
-    radial-gradient(820px 720px at 50% 122%, rgb(0 59 70 / 0.6), transparent 62%),
-    linear-gradient(158deg, var(--color-bg-base), var(--color-bg-deep));
+    radial-gradient(900px 620px at 12% -12%, rgb(7 87 91 / 0.42), transparent 64%),
+    radial-gradient(760px 540px at 106% 12%, rgb(115 213 227 / 0.12), transparent 60%),
+    radial-gradient(820px 720px at 50% 122%, rgb(0 59 70 / 0.42), transparent 64%),
+    linear-gradient(158deg, var(--color-bg-base), var(--color-surface-0));
 }
 
 /* Aurora blobs: two blurred color fields drifting behind the content.
@@ -191,20 +238,20 @@ body {
 .aurora::before {
   top: -18vw;
   left: -8vw;
-  background: rgb(7 87 91 / 0.5);
+  background: rgb(7 87 91 / 0.34);
   animation: aurora-drift-a 60s ease-in-out infinite alternate;
 }
 .aurora::after {
   bottom: -20vw;
   right: -10vw;
-  background: rgb(102 165 173 / 0.16);
+  background: rgb(115 213 227 / 0.1);
   animation: aurora-drift-b 75s ease-in-out infinite alternate;
 }
 .aurora.connected::before {
-  background: rgb(47 224 127 / 0.14);
+  background: rgb(66 229 142 / 0.12);
 }
 .aurora.connected::after {
-  background: rgb(47 224 127 / 0.09);
+  background: rgb(66 229 142 / 0.07);
 }
 @keyframes aurora-drift-a {
   to {
@@ -301,9 +348,9 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-/* A short, narrow, or portrait window becomes a compact horizontal workspace. Motion's
-   layout animation carries the rail from the left edge to this bottom dock. */
-@media (max-height: 620px), (max-width: 640px), (orientation: portrait) {
+/* Compact-height desktop, including Tauri's real 940x430 minimum. This mode
+   preserves horizontal room and uses a deliberately narrow bottom dock. */
+@media (max-height: 620px) and (min-width: 641px) {
   .app-workspace {
     flex-direction: column;
   }
@@ -318,9 +365,10 @@ body {
     width: 100% !important;
     height: 62px;
     flex-direction: row;
+    gap: 8px;
     padding: 8px 12px;
     border-top: 1px solid var(--color-glass-border);
-    background: rgb(0 19 26 / 0.82);
+    background: rgb(0 21 29 / 0.9);
     backdrop-filter: blur(var(--blur-glass)) saturate(140%);
     box-shadow: 0 -10px 30px rgb(0 8 11 / 0.25);
   }
@@ -329,13 +377,14 @@ body {
     min-width: 0;
     flex: 1;
     flex-direction: row;
-    gap: 6px;
+    justify-content: center;
+    gap: clamp(6px, 1.4vw, 14px);
   }
 
   .app-nav-button {
     height: 44px;
-    min-width: 0;
-    flex: 1;
+    width: 54px;
+    flex: 0 0 54px;
     justify-content: center !important;
     gap: 0 !important;
     padding-inline: 10px !important;
@@ -354,11 +403,146 @@ body {
 
   .app-nav-status,
   .app-nav-version {
+    margin: 0;
+    padding: 0;
+  }
+
+  .app-nav-status {
+    display: block !important;
+    width: 44px;
+    flex: 0 0 44px;
+  }
+
+  .app-nav-version {
     display: none !important;
   }
 
   .app-page-frame {
-    padding-top: 12px;
-    padding-bottom: 12px;
+    padding: 10px 18px 12px;
+  }
+
+  .dashboard-shell {
+    gap: 10px;
+  }
+
+  .dashboard-connect-box {
+    width: 9.5rem !important;
+    height: 9.5rem !important;
+  }
+
+  .dashboard-hero-card {
+    padding-block: 10px;
+  }
+
+  .dashboard-hero-layout {
+    gap: 12px 20px;
+  }
+
+  .dashboard-status {
+    font-size: 1rem;
+    letter-spacing: 0.11em;
+  }
+
+  .dashboard-stats-card {
+    padding-block: 12px;
+  }
+
+  .dashboard-stats-grid {
+    margin-bottom: 10px;
+    gap-block: 10px;
+  }
+
+  .dashboard-chart {
+    height: 5.25rem;
+  }
+}
+
+/* Mobile-width is independent from height: controls keep their full-width
+   flow, while the six navigation targets share the bottom dock. */
+@media (max-width: 640px) {
+  .app-workspace {
+    flex-direction: column;
+  }
+
+  .app-main {
+    order: 1;
+    width: 100%;
+  }
+
+  .app-nav {
+    order: 2;
+    width: 100% !important;
+    height: 62px;
+    flex-direction: row;
+    gap: 4px;
+    padding: 8px 8px;
+    border-top: 1px solid var(--color-glass-border);
+    background: rgb(0 21 29 / 0.92);
+    backdrop-filter: blur(var(--blur-glass)) saturate(140%);
+    box-shadow: 0 -10px 30px rgb(0 8 11 / 0.25);
+  }
+
+  .app-nav-list {
+    min-width: 0;
+    flex: 1;
+    flex-direction: row;
+    gap: 4px;
+  }
+
+  .app-nav-button {
+    height: 44px;
+    min-width: 0;
+    flex: 1;
+    justify-content: center !important;
+    gap: 0 !important;
+    padding-inline: 6px !important;
+  }
+
+  .app-nav-label {
+    display: none !important;
+  }
+
+  .app-nav-indicator-edge {
+    inset: auto 10px 0 !important;
+    width: auto !important;
+    height: 3px;
+    background: linear-gradient(90deg, var(--color-accent), var(--color-accent-2));
+  }
+
+  .app-nav-status {
+    display: block !important;
+    width: 36px;
+    flex: 0 0 36px;
+    margin: 0;
+    padding: 0;
+  }
+
+  .app-nav-version {
+    display: none !important;
+  }
+
+  .app-page-frame {
+    padding: 12px 16px;
+  }
+
+  .settings-row {
+    min-height: 3.5rem;
+    height: auto;
+    align-items: stretch;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+    padding-block: 8px;
+  }
+
+  .settings-row-control {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .settings-row-control > div.relative,
+  .settings-row-control > .inline-flex:not([role="switch"]) {
+    width: 100% !important;
+    max-width: 100%;
   }
 }

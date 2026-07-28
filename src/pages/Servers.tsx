@@ -120,9 +120,9 @@ function AddServersModal({
         placeholder={t("servers.addModal.pasteHint")}
         spellCheck={false}
         className={cn(
-          "h-40 w-full resize-none rounded-(--radius-ctl) border border-glass-border bg-glass p-3 font-mono text-xs text-text select-text",
+          "h-40 w-full resize-none rounded-(--radius-ctl) border border-interactive-border bg-surface-2/55 p-3 font-mono text-xs text-text select-text",
           "outline-none placeholder:text-text-faint",
-          "transition-[border-color,box-shadow] duration-150 focus:border-accent/60 focus:ring-2 focus:ring-accent/40",
+          "transition-[border-color,box-shadow] duration-150 focus:border-focus-ring focus:ring-2 focus:ring-focus-ring/55",
         )}
       />
       <div className="mt-2 flex items-center justify-between">
@@ -382,7 +382,10 @@ export function Servers() {
             <ServerRow
               key={key}
               server={server}
-              selected={server.id === selectedServerId}
+              selected={
+                server.id === selectedServerId &&
+                (group.key === GROUP_FAVORITES || !server.favorite)
+              }
               testing={pendingPings.has(server.id)}
               deletable={manualIds.has(server.id)}
               highlighted={highlight === key}
@@ -406,7 +409,7 @@ export function Servers() {
     <PageShell width="list" className="gap-5">
       <div className="flex flex-wrap items-center gap-3">
         <div className="mr-auto min-w-0">
-          <h1 className="font-display text-[clamp(1.05rem,1.5vw,1.35rem)] font-extrabold text-text">
+          <h1 className="font-display text-[clamp(1.2rem,1.7vw,1.5rem)] font-extrabold text-text">
             {t("servers.title")}
           </h1>
           <div className="mt-0.5 text-xs text-text-faint">
@@ -443,7 +446,24 @@ export function Servers() {
         placeholder={t("servers.search")}
       />
 
-      {all.length === 0 ? (
+      {!loaded ? (
+        <div className="flex flex-col gap-4" aria-label={t("common.loading")}>
+          <div className="h-10 animate-pulse rounded-(--radius-ctl) border border-glass-border bg-surface-2/70" />
+          {[0, 1, 2].map((row) => (
+            <GlassCard
+              key={row}
+              className="flex h-[4.5rem] items-center gap-4 px-4"
+            >
+              <div className="h-9 w-9 animate-pulse rounded-(--radius-ctl) bg-glass-strong" />
+              <div className="min-w-0 flex-1">
+                <div className="h-3 w-2/5 animate-pulse rounded-full bg-glass-strong" />
+                <div className="mt-2 h-2.5 w-3/5 animate-pulse rounded-full bg-glass" />
+              </div>
+              <div className="h-7 w-16 animate-pulse rounded-full bg-glass-strong" />
+            </GlassCard>
+          ))}
+        </div>
+      ) : all.length === 0 ? (
         <GlassCard>
           <EmptyState
             icon={<ServerOff size={24} />}

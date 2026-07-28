@@ -30,10 +30,26 @@ import { PageShell } from "../components/ui/PageShell";
  * actually renders in gradients. Keep these four in sync with :root[data-accent].
  */
 const ACCENTS: { value: Accent; from: string; to: string }[] = [
-  { value: "violet", from: "#66a5ad", to: "#7ecfda" }, // wave (default, @theme)
-  { value: "cyan", from: "#5ad0e0", to: "#a9e4ec" }, // surf
-  { value: "emerald", from: "#4a86b8", to: "#66a5ad" }, // abyss
-  { value: "amber", from: "#c4dfe6", to: "#8fc2cc" }, // foam
+  {
+    value: "violet",
+    from: "var(--color-accent-violet-from)",
+    to: "var(--color-accent-violet-to)",
+  },
+  {
+    value: "cyan",
+    from: "var(--color-accent-cyan-from)",
+    to: "var(--color-accent-cyan-to)",
+  },
+  {
+    value: "emerald",
+    from: "var(--color-accent-emerald-from)",
+    to: "var(--color-accent-emerald-to)",
+  },
+  {
+    value: "amber",
+    from: "var(--color-accent-amber-from)",
+    to: "var(--color-accent-amber-to)",
+  },
 ];
 
 /** Must stay in sync with Settings::default().sub_user_agent on the Rust side. */
@@ -42,7 +58,7 @@ const DEFAULT_SUB_USER_AGENT = "v2rayN/7.13 Umbra/0.1.0";
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <GlassCard className="px-5 py-4">
-      <h2 className="mb-1 text-[13px] font-semibold tracking-[0.12em] text-text-faint uppercase">
+      <h2 className="mb-2 border-b border-glass-border pb-2.5 font-display text-[14px] font-bold tracking-[0.035em] text-accent">
         {title}
       </h2>
       <div>{children}</div>
@@ -54,20 +70,31 @@ function Row({
   label,
   children,
   sub,
+  description,
 }: {
   label: string;
   children?: ReactNode;
   sub?: boolean;
+  description?: ReactNode;
 }) {
   return (
     <div
       className={cn(
-        "flex h-11 items-center justify-between gap-4 border-b border-glass-border/60 last:border-b-0",
+        "settings-row flex min-h-12 items-center justify-between gap-4 border-b border-glass-border/70 last:border-b-0",
         sub && "pl-4",
       )}
     >
-      <span className="min-w-0 truncate text-[13px] text-text-dim">{label}</span>
-      <span className="flex shrink-0 items-center gap-2">{children}</span>
+      <span className="min-w-0">
+        <span className="block text-[13px] leading-snug text-text-dim">{label}</span>
+        {description && (
+          <span className="mt-1 block max-w-xl text-xs leading-relaxed text-text-faint">
+            {description}
+          </span>
+        )}
+      </span>
+      <span className="settings-row-control flex shrink-0 items-center gap-2">
+        {children}
+      </span>
     </div>
   );
 }
@@ -113,16 +140,16 @@ function SubscriptionsSection({ settings }: { settings: AppSettings }) {
 
   return (
     <Section title={t("settings.subscriptions.title")}>
-      <Row label={t("settings.subscriptions.sendHwid")}>
+      <Row
+        label={t("settings.subscriptions.sendHwid")}
+        description={t("settings.subscriptions.sendHwidHint")}
+      >
         <Toggle
           checked={settings.sendHwid}
           onChange={(v) => void patch({ sendHwid: v })}
           aria-label={t("settings.subscriptions.sendHwid")}
         />
       </Row>
-      <p className="py-2.5 text-xs leading-relaxed text-text-faint">
-        {t("settings.subscriptions.sendHwidHint")}
-      </p>
       {settings.sendHwid && (
         <Row sub label={t("settings.subscriptions.hwid")}>
           <span className="max-w-[clamp(7rem,24vw,16rem)] truncate font-mono text-xs text-text-dim select-text">
@@ -138,7 +165,10 @@ function SubscriptionsSection({ settings }: { settings: AppSettings }) {
           </IconButton>
         </Row>
       )}
-      <Row label={t("settings.subscriptions.userAgent")}>
+      <Row
+        label={t("settings.subscriptions.userAgent")}
+        description={t("settings.subscriptions.userAgentNote")}
+      >
         <TextField
           mono
           value={userAgent}
@@ -156,9 +186,6 @@ function SubscriptionsSection({ settings }: { settings: AppSettings }) {
           {t("settings.subscriptions.reset")}
         </Button>
       </Row>
-      <p className="pt-2.5 pb-1 text-xs leading-relaxed text-text-faint">
-        {t("settings.subscriptions.userAgentNote")}
-      </p>
     </Section>
   );
 }
@@ -332,9 +359,26 @@ export function Settings() {
 
   if (!settings) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <Spinner size={22} className="text-text-faint" />
-      </div>
+      <PageShell
+        width="form"
+        className="gap-4"
+      >
+        <div className="h-7 w-32 animate-pulse rounded-full bg-glass-strong" />
+        {[0, 1, 2].map((section) => (
+          <GlassCard key={section} className="px-5 py-4">
+            <div className="h-4 w-28 animate-pulse rounded-full bg-glass-strong" />
+            {[0, 1, 2].map((row) => (
+              <div
+                key={row}
+                className="flex h-12 items-center justify-between border-b border-glass-border/60 last:border-0"
+              >
+                <div className="h-3 w-2/5 animate-pulse rounded-full bg-glass" />
+                <div className="h-7 w-20 animate-pulse rounded-full bg-glass-strong" />
+              </div>
+            ))}
+          </GlassCard>
+        ))}
+      </PageShell>
     );
   }
 
@@ -352,7 +396,7 @@ export function Settings() {
 
   return (
     <PageShell width="form" className="gap-4">
-      <h1 className="font-display text-[clamp(1.05rem,1.5vw,1.35rem)] font-extrabold text-text">
+      <h1 className="font-display text-[clamp(1.2rem,1.7vw,1.5rem)] font-extrabold text-text">
         {t("settings.title")}
       </h1>
 
@@ -407,17 +451,22 @@ export function Settings() {
                 type="button"
                 title={t(`settings.appearance.accents.${a.value}`)}
                 onClick={() => set("accent", a.value)}
-                className="relative flex h-7 w-7 items-center justify-center"
+                aria-pressed={settings.accent === a.value}
+                className={cn(
+                  "relative flex h-9 w-9 items-center justify-center rounded-full outline-none",
+                  "transition-[background-color,box-shadow,transform] duration-150 hover:bg-hover-surface active:scale-95",
+                  "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
+                )}
               >
                 {settings.accent === a.value && (
                   <motion.span
                     layoutId="accent-ring"
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                    className="absolute inset-0 rounded-full border-2 border-white/70"
+                    className="absolute inset-0 rounded-full border-2 border-selected-border bg-selected-surface shadow-[0_0_18px_rgb(115_213_227/0.2)]"
                   />
                 )}
                 <span
-                  className="h-5 w-5 rounded-full"
+                  className="relative h-[22px] w-[22px] rounded-full"
                   style={{
                     backgroundImage: `linear-gradient(140deg, ${a.from}, ${a.to})`,
                   }}

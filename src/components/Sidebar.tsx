@@ -70,16 +70,19 @@ export function Sidebar() {
               aria-label={label}
               className={cn(
                 "app-nav-button relative flex h-10 items-center gap-3 rounded-(--radius-ctl) px-3.5 text-[13px] font-medium",
-                "transition-colors duration-150",
+                "outline-none transition-[background-color,color,box-shadow] duration-150",
+                "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
                 "max-[1000px]:justify-center max-[1000px]:gap-0 max-[1000px]:px-0",
-                active ? "text-text" : "text-text-dim hover:text-text",
+                active
+                  ? "text-text"
+                  : "text-text-dim hover:bg-hover-surface hover:text-text",
               )}
             >
               {active && (
                 <motion.span
                   layoutId="nav-pill"
                   transition={{ type: "spring", stiffness: 450, damping: 35 }}
-                  className="absolute inset-0 overflow-hidden rounded-(--radius-ctl) border border-glass-border bg-glass-strong"
+                  className="absolute inset-0 overflow-hidden rounded-(--radius-ctl) border border-selected-border bg-selected-surface"
                 >
                   <span className="app-nav-indicator-edge absolute top-2 bottom-2 left-0 w-[3px] rounded-full bg-linear-180 from-accent to-accent-2" />
                 </motion.span>
@@ -96,6 +99,7 @@ export function Sidebar() {
       <div className="app-nav-status mt-auto min-h-0 shrink-0 pt-4">
         <GlassCard
           interactive
+          variant="glass"
           onClick={() => setPage("dashboard")}
           title={`${activeName} — ${t(`dashboard.status.${conn.status}`)}`}
           className="p-3 max-[1000px]:flex max-[1000px]:justify-center max-[1000px]:p-2.5"
@@ -105,7 +109,7 @@ export function Sidebar() {
               className={cn(
                 "h-2 w-2 shrink-0 rounded-full",
                 conn.status === "connected"
-                  ? "bg-ok shadow-[0_0_8px_rgb(47_224_127/0.8)]"
+                  ? "bg-ok shadow-[0_0_10px_var(--color-ok)]"
                   : conn.status === "connecting" || conn.status === "stopping"
                     ? "animate-pulse bg-warn"
                     : "bg-text-faint",

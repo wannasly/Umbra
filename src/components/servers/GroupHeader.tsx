@@ -34,13 +34,13 @@ export function GroupHeader({
     <div
       className={cn(
         "sticky top-1 z-20 mb-2 flex min-h-10 w-full flex-wrap items-center gap-x-2 gap-y-1 rounded-(--radius-ctl) px-3 py-2",
-        "border border-glass-border bg-bg-raise/95 shadow-[0_6px_20px_rgb(0_8_11/0.28)] backdrop-blur-md",
+        "border border-interactive-border bg-surface-2/95 shadow-[0_8px_24px_rgb(0_8_11/0.24)] backdrop-blur-md",
       )}
     >
       <button
         type="button"
         onClick={onToggle}
-        className="flex min-w-40 flex-1 items-center gap-1.5 text-left"
+        className="flex min-h-9 min-w-40 flex-1 items-center gap-1.5 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-focus-ring"
       >
         <ChevronRight
           size={14}
@@ -50,7 +50,7 @@ export function GroupHeader({
           )}
         />
         {icon}
-        <span className="truncate text-xs font-semibold tracking-[0.08em] text-text-dim uppercase">
+        <span className="truncate text-[13px] font-semibold tracking-[0.055em] text-accent">
           {title}
         </span>
         <span className="shrink-0 text-[11px] text-text-faint">
@@ -63,7 +63,6 @@ export function GroupHeader({
         // pointer gesture that has to fight a scrolling list.
         <span className="flex shrink-0 items-center">
           <IconButton
-            className="h-7 w-7"
             title={t("servers.moveUp")}
             disabled={!canMoveUp}
             onClick={() => onMove(-1)}
@@ -71,7 +70,6 @@ export function GroupHeader({
             <ChevronUp size={14} />
           </IconButton>
           <IconButton
-            className="h-7 w-7"
             title={t("servers.moveDown")}
             disabled={!canMoveDown}
             onClick={() => onMove(1)}

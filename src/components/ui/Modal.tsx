@@ -35,11 +35,14 @@ export function Modal({ open, onClose, title, children, className }: ModalProps)
           className="fixed inset-0 z-100 flex items-center justify-center bg-bg-deep/70 p-8 backdrop-blur-[8px]"
         >
           <motion.div
+            role="dialog"
+            aria-modal="true"
+            aria-label={title}
             initial={{ opacity: 0, scale: 0.96, y: 8 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ type: "spring", stiffness: 400, damping: 30 }}
-            className={cn("glass w-full max-w-md bg-bg-raise/80 p-6", className)}
+            className={cn("glass w-full max-w-md bg-surface-glass p-6", className)}
           >
             {title && (
               <h2 className="mb-4 font-display text-base font-bold text-text">

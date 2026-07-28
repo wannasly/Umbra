@@ -57,17 +57,15 @@ export function ServerRow({
         ref={innerRef}
         interactive
         onClick={onSelect}
+        aria-selected={selected}
         className={cn(
           "relative flex items-center gap-3 px-4 py-3",
-          selected && "shadow-[0_0_20px_rgb(47_224_127/0.12)]",
+          selected && "border-selected-border bg-selected-surface",
           // The flash after "scroll to the active server": a ring rather than a
           // background change, so it reads as "here it is" and not as a state.
           highlighted && "ring-2 ring-accent/70",
         )}
       >
-        {selected && (
-          <span className="absolute top-3 bottom-3 left-0 w-[3px] rounded-full bg-ok" />
-        )}
         {/* radio */}
         <span
           className={cn(
@@ -83,7 +81,7 @@ export function ServerRow({
             <span className="truncate text-[15px] font-semibold text-text">
               {label}
             </span>
-            <span className="flex shrink-0 items-center gap-1">
+            <span className="flex shrink-0 items-center gap-1 max-[720px]:hidden">
               {chips.map((c) => (
                 <span
                   key={c.label}
@@ -101,7 +99,7 @@ export function ServerRow({
             {used > 0 && (
               <span
                 title={t("servers.totalTraffic")}
-                className="flex shrink-0 items-center gap-1 text-text-faint tabular-nums"
+                className="flex shrink-0 items-center gap-1 text-text-faint tabular-nums max-[1000px]:hidden"
               >
                 <ArrowDown size={10} className="text-accent-2" />
                 {formatBytes(server.totalDown ?? 0)}
@@ -124,8 +122,9 @@ export function ServerRow({
             onToggleFavorite();
           }}
           className={cn(
-            "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-(--radius-ctl)",
-            "transition-[background-color,color] duration-150 hover:bg-glass-strong",
+            "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-(--radius-ctl) outline-none",
+            "transition-[background-color,color,transform] duration-150 hover:bg-hover-surface active:scale-95",
+            "focus-visible:ring-2 focus-visible:ring-focus-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface-0",
             server.favorite ? "text-warn" : "text-text-faint hover:text-text",
           )}
         >

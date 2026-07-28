@@ -40,11 +40,11 @@ export function KebabMenu({ items }: { items: KebabMenuItem[] }) {
               item.onClick();
             }}
             className={cn(
-              "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] whitespace-nowrap",
-              "transition-colors duration-100",
+              "flex w-full items-center gap-2.5 px-3 py-2 text-left text-[13px] whitespace-nowrap outline-none",
+              "transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus-ring",
               item.danger
                 ? "text-danger hover:bg-danger/10"
-                : "text-text-dim hover:bg-glass-strong hover:text-text",
+                : "text-text-dim hover:bg-hover-surface hover:text-text focus-visible:bg-hover-surface focus-visible:text-text",
             )}
           >
             {item.icon}
