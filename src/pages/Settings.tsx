@@ -22,6 +22,7 @@ import { Select } from "../components/ui/Select";
 import { TextField } from "../components/ui/TextField";
 import { Spinner } from "../components/ui/Spinner";
 import { PageShell } from "../components/ui/PageShell";
+import { APP_VERSION } from "../lib/version";
 
 /**
  * Swatches must mirror the presets in styles/theme.css. The ids are persisted by
@@ -53,7 +54,7 @@ const ACCENTS: { value: Accent; from: string; to: string }[] = [
 ];
 
 /** Must stay in sync with Settings::default().sub_user_agent on the Rust side. */
-const DEFAULT_SUB_USER_AGENT = "v2rayN/7.13 Umbra/0.1.0";
+const DEFAULT_SUB_USER_AGENT = `v2rayN/7.13 Umbra/${APP_VERSION}`;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -554,7 +555,7 @@ export function Settings() {
         <div className="flex items-center justify-between py-2">
           <div>
             <div className="text-[14px] font-semibold text-text">
-              {t("settings.about.version", { version: "v0.1.2" })}
+              {t("settings.about.version", { version: `v${APP_VERSION}` })}
             </div>
             <div className="mt-0.5 text-[13px] text-text-dim">
               {t("settings.about.description")}

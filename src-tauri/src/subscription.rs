@@ -14,7 +14,7 @@ use crate::parser;
 /// Panels sniff the UA and serve different formats to clash/sing-box clients;
 /// impersonate a plain v2rayN to always get the URI list. Overridable in
 /// settings because some panels only serve whitelisted clients.
-pub const DEFAULT_SUB_USER_AGENT: &str = "v2rayN/7.13 Umbra/0.1.0";
+pub const DEFAULT_SUB_USER_AGENT: &str = concat!("v2rayN/7.13 Umbra/", env!("CARGO_PKG_VERSION"));
 
 /// Remnawave-style panels do not fail a device-gated request: they answer
 /// HTTP 200 with a single placeholder entry (`0.0.0.0:1`, named e.g.

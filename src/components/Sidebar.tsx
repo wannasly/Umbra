@@ -15,6 +15,7 @@ import { useSettings } from "../stores/settings";
 import { useServers, allServers } from "../stores/servers";
 import { GlassCard } from "./ui/GlassCard";
 import { cn } from "../lib/cn";
+import { APP_VERSION, APP_VERSION_SHORT } from "../lib/version";
 
 const NAV: { page: Page; icon: LucideIcon }[] = [
   { page: "dashboard", icon: House },
@@ -126,8 +127,8 @@ export function Sidebar() {
           </div>
         </GlassCard>
         <div className="app-nav-version mt-2 px-1 text-[10px] text-text-faint max-[1000px]:text-center">
-          <span className="max-[1000px]:hidden">v0.1.0</span>
-          <span className="hidden max-[1000px]:inline">0.1</span>
+          <span className="max-[1000px]:hidden">v{APP_VERSION}</span>
+          <span className="hidden max-[1000px]:inline">{APP_VERSION_SHORT}</span>
         </div>
       </div>
     </motion.aside>

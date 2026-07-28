@@ -10,6 +10,7 @@ import type {
   Settings,
   Subscription,
 } from "./ipc";
+import { APP_VERSION } from "./version";
 
 const now = () => Date.now();
 
@@ -206,7 +207,7 @@ const state: {
     serverSort: "default",
     collapsedGroups: [],
     githubMirror: "",
-    subUserAgent: "v2rayN/7.13 Umbra/0.1.0",
+    subUserAgent: `v2rayN/7.13 Umbra/${APP_VERSION}`,
     sendHwid: true,
     hwid: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
   },

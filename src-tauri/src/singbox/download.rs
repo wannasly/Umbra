@@ -91,7 +91,7 @@ fn update_available(current: Option<&str>, latest: &str) -> bool {
 fn gh_client() -> AppResult<reqwest::Client> {
     reqwest::Client::builder()
         .no_proxy()
-        .user_agent("Umbra/0.1.0")
+        .user_agent(concat!("Umbra/", env!("CARGO_PKG_VERSION")))
         .connect_timeout(Duration::from_secs(15))
         .build()
         .map_err(|e| AppError::Network(e.to_string()))
