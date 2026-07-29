@@ -235,6 +235,8 @@
       "tunStack": "Network stack",
       "strictRoute": "Strict route",
       "mtu": "MTU",
+      "discordVoiceDirect": "Direct Discord voice",
+      "discordVoiceDirectHint": "Only Discord voice UDP bypasses the VPN so VLESS/TCP downloads cannot inflate its latency. Chat and other Discord traffic stay tunneled. Reconnect after changing this.",
       "tunAdminNote": "TUN mode requires administrator rights. Umbra will ask to relaunch elevated when you enable it."
     },
     "subscriptions": {

@@ -201,6 +201,7 @@ const state: {
     tunStack: "mixed",
     tunStrictRoute: true,
     tunMtu: 9000,
+    discordVoiceDirect: true,
     ipStrategy: "ipv4_only",
     pingUrl: "https://www.gstatic.com/generate_204",
     reduceMotion: false,

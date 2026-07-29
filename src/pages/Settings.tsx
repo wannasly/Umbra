@@ -542,6 +542,16 @@ export function Settings() {
             className="h-8 text-right"
           />
         </Row>
+        <Row sub label={t("settings.connection.discordVoiceDirect")}>
+          <Toggle
+            checked={settings.discordVoiceDirect}
+            onChange={(v) => set("discordVoiceDirect", v)}
+            aria-label={t("settings.connection.discordVoiceDirect")}
+          />
+        </Row>
+        <p className="pt-1 pb-1 text-xs leading-relaxed text-text-faint">
+          {t("settings.connection.discordVoiceDirectHint")}
+        </p>
         <p className="pt-2.5 pb-1 text-xs leading-relaxed text-text-faint">
           {t("settings.connection.tunAdminNote")}
         </p>

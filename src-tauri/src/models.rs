@@ -353,6 +353,10 @@ pub struct Settings {
     pub tun_stack: String,
     pub tun_strict_route: bool,
     pub tun_mtu: u32,
+    /// Route only Discord's latency-sensitive UDP voice traffic directly.
+    /// This avoids TCP tunnel head-of-line blocking during large downloads
+    /// while keeping Discord's HTTP/WebSocket traffic behind the proxy.
+    pub discord_voice_direct: bool,
     pub ip_strategy: IpStrategy,
     pub ping_url: String,
     pub reduce_motion: bool,
@@ -395,6 +399,7 @@ impl Default for Settings {
             tun_stack: "mixed".into(),
             tun_strict_route: true,
             tun_mtu: 9000,
+            discord_voice_direct: true,
             ip_strategy: IpStrategy::Ipv4Only,
             ping_url: "https://www.gstatic.com/generate_204".into(),
             reduce_motion: false,

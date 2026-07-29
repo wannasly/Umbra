@@ -156,6 +156,8 @@ export interface Settings {
   tunStack: "mixed" | "system" | "gvisor";
   tunStrictRoute: boolean;
   tunMtu: number;
+  /** bypass only Discord voice UDP to avoid latency under tunneled downloads */
+  discordVoiceDirect: boolean;
   ipStrategy: IpStrategy;
   pingUrl: string;
   reduceMotion: boolean;

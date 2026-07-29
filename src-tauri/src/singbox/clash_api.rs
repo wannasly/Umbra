@@ -12,6 +12,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::error::{AppError, AppResult};
 use crate::events::{TrafficStats, EV_TRAFFIC};
+use crate::net::traffic::{self, TunCounters};
 use crate::singbox::process::CoreShared;
 use crate::state::AppState;
 use crate::storage;
@@ -162,6 +163,58 @@ pub async fn traffic_loop(app: AppHandle, shared: Arc<CoreShared>, port: u16, se
             break;
         }
         tokio::time::sleep(TRAFFIC_RECONNECT_DELAY).await;
+    }
+}
+
+/// Read the Windows TUN adapter directly once per second.
+///
+/// The adapter counts every captured byte, including optimized sing-box paths
+/// that do not always reach Clash API's L4 tracker. This is the authoritative
+/// live/session counter in TUN mode; system-proxy mode still uses `/traffic`.
+#[cfg(windows)]
+pub async fn tun_traffic_loop(app: AppHandle, shared: Arc<CoreShared>) {
+    let mut ticker = tokio::time::interval(Duration::from_secs(1));
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut previous: Option<(TunCounters, std::time::Instant)> = None;
+    let mut up_total = 0.0f64;
+    let mut down_total = 0.0f64;
+    let mut totals = TotalsAccumulator::default();
+
+    while !shared.stopping.load(Ordering::SeqCst) {
+        ticker.tick().await;
+        let now = std::time::Instant::now();
+        let Some(current) = traffic::tun_counters() else {
+            previous = None;
+            continue;
+        };
+        let Some((before, sampled_at)) = previous.replace((current, now)) else {
+            continue;
+        };
+        let elapsed = now.duration_since(sampled_at).as_secs_f64().max(0.001);
+        let up_delta = current.up.saturating_sub(before.up) as f64;
+        let down_delta = current.down.saturating_sub(before.down) as f64;
+        let up = up_delta / elapsed;
+        let down = down_delta / elapsed;
+        up_total += up_delta;
+        down_total += down_delta;
+
+        let _ = app.emit(
+            EV_TRAFFIC,
+            &TrafficStats {
+                up_bps: up,
+                down_bps: down,
+                up_total,
+                down_total,
+            },
+        );
+        let active = { app.state::<AppState>().conn.read().await.server_id.clone() };
+        for batch in totals.record(active.as_deref(), up_delta, down_delta) {
+            persist_totals(&app, &batch).await;
+        }
+    }
+
+    for batch in totals.drain() {
+        persist_totals(&app, &batch).await;
     }
 }
 

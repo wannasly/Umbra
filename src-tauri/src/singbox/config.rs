@@ -295,6 +295,17 @@ fn route(settings: &Settings) -> Value {
             }
         });
     }
+    if settings.discord_voice_direct {
+        // VLESS/Reality transports UDP inside TCP (XUDP). A bulk TCP download
+        // can therefore delay Discord's real-time packets by seconds. Bypass
+        // only voice UDP; Discord's login, chat and media remain proxied.
+        // Explicit application rules stay first so the user can override this.
+        rules.push(json!({
+            "process_name": ["Discord.exe", "DiscordCanary.exe", "DiscordPTB.exe"],
+            "network": "udp",
+            "outbound": "direct"
+        }));
+    }
     rules.extend([
         json!({ "ip_is_private": true, "outbound": "direct" }),
         json!({ "clash_mode": "Direct", "outbound": "direct" }),
@@ -534,12 +545,13 @@ mod tests {
     #[test]
     fn bypass_ru_adds_rule_and_rule_set() {
         let servers = vec![entry("a", "S")];
-        let off = gen(&Settings::default(), &servers, "a");
+        let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
+        let off = gen(&settings, &servers, "a");
         let rules = at(&off, "/route/rules").as_array().expect("rules");
         assert_eq!(rules.len(), 5);
         assert!(off.json.pointer("/route/rule_set").is_none());
 
-        let mut settings = Settings::default();
         settings.bypass_ru = true;
         let on = gen(&settings, &servers, "a");
         let rules = at(&on, "/route/rules").as_array().expect("rules");
@@ -564,6 +576,7 @@ mod tests {
     fn application_rules_precede_generic_routes() {
         let servers = vec![entry("a", "S")];
         let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
         settings.app_routes = vec![
             crate::models::AppRouteRule {
                 id: "browser".into(),
@@ -606,6 +619,7 @@ mod tests {
     fn route_default_can_be_direct_and_empty_processes_are_ignored() {
         let servers = vec![entry("a", "S")];
         let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
         settings.route_default = RouteTarget::Direct;
         settings.app_routes = vec![crate::models::AppRouteRule {
             id: "empty".into(),
@@ -649,6 +663,39 @@ mod tests {
         assert_eq!(inb["strict_route"], false);
         assert_eq!(inb["stack"], "gvisor");
         assert_eq!(inb["udp_timeout"], "5m");
+    }
+
+    #[test]
+    fn discord_voice_udp_is_direct_without_bypassing_discord_tcp() {
+        let servers = vec![entry("a", "S")];
+        let cfg = gen(&Settings::default(), &servers, "a");
+        let rules = at(&cfg, "/route/rules").as_array().unwrap();
+        let discord = rules
+            .iter()
+            .find(|rule| {
+                rule["process_name"]
+                    .as_array()
+                    .is_some_and(|names| names.iter().any(|name| name == "Discord.exe"))
+            })
+            .expect("default config should protect Discord voice from tunnel congestion");
+        assert_eq!(discord["network"], "udp");
+        assert_eq!(discord["outbound"], "direct");
+    }
+
+    #[test]
+    fn discord_voice_bypass_can_be_disabled_for_full_tunnel_privacy() {
+        let servers = vec![entry("a", "S")];
+        let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
+        let cfg = gen(&settings, &servers, "a");
+        let rules = at(&cfg, "/route/rules").as_array().unwrap();
+        assert!(rules
+            .iter()
+            .all(|rule| rule.get("process_name").is_none_or(|names| {
+                !names
+                    .as_array()
+                    .is_some_and(|names| names.iter().any(|name| name == "Discord.exe"))
+            })));
     }
 
     #[test]

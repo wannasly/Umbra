@@ -326,6 +326,18 @@ pub async fn start(
     let shared = Arc::new(CoreShared::default());
     let supervisor =
         tauri::async_runtime::spawn(supervise(app.clone(), shared.clone(), child, ctx));
+    #[cfg(windows)]
+    let traffic = if mode == Mode::Tun {
+        tauri::async_runtime::spawn(clash_api::tun_traffic_loop(app.clone(), shared.clone()))
+    } else {
+        tauri::async_runtime::spawn(clash_api::traffic_loop(
+            app.clone(),
+            shared.clone(),
+            config.clash_port,
+            config.clash_secret.clone(),
+        ))
+    };
+    #[cfg(not(windows))]
     let traffic = tauri::async_runtime::spawn(clash_api::traffic_loop(
         app.clone(),
         shared.clone(),
