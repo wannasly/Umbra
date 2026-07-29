@@ -1,6 +1,6 @@
 [package]
 name = "umbra"
-version = "0.2.1"
+version = "0.2.2"
 description = "Umbra — a sleek sing-box GUI client"
 authors = ["umbra"]
 edition = "2021"
