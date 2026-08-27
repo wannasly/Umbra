@@ -14,6 +14,26 @@ interface SettingsStore {
   setCoreProgress: (p: DownloadProgress | null) => void;
 }
 
+function normalizeSettings(s: Settings): Settings {
+  const routingRules = Array.isArray(s.routingRules)
+    ? s.routingRules
+    : Array.isArray(s.appRoutes)
+      ? s.appRoutes.map((r) => ({
+          id: r.id,
+          enabled: true,
+          ruleType: "process" as const,
+          value: r.processName,
+          processMatcher: "name" as const,
+          action: r.action,
+        }))
+      : [];
+
+  return {
+    ...s,
+    routingRules,
+  };
+}
+
 function applySideEffects(s: Settings): void {
   document.documentElement.dataset.accent = s.accent;
   if (i18n.language !== s.language) void i18n.changeLanguage(s.language);
@@ -23,19 +43,21 @@ export const useSettings = create<SettingsStore>((set, get) => ({
   settings: null,
   coreProgress: null,
   load: async () => {
-    const settings = await ipc("get_settings");
+    const raw = await ipc("get_settings");
+    const settings = normalizeSettings(raw);
     set({ settings });
     applySideEffects(settings);
   },
   patch: async (patch) => {
     const current = get().settings;
     if (current) {
-      const optimistic = { ...current, ...patch };
+      const optimistic = normalizeSettings({ ...current, ...patch });
       set({ settings: optimistic });
       applySideEffects(optimistic);
     }
     try {
-      const settings = await ipc("set_settings", { patch });
+      const raw = await ipc("set_settings", { patch });
+      const settings = normalizeSettings(raw);
       set({ settings });
       applySideEffects(settings);
     } catch (e) {
@@ -48,6 +70,6 @@ export const useSettings = create<SettingsStore>((set, get) => ({
     }
   },
   setLocal: (patch) =>
-    set((s) => (s.settings ? { settings: { ...s.settings, ...patch } } : s)),
+    set((s) => (s.settings ? { settings: normalizeSettings({ ...s.settings, ...patch }) } : s)),
   setCoreProgress: (coreProgress) => set({ coreProgress }),
 }));

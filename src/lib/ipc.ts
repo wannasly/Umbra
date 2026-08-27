@@ -123,6 +123,28 @@ export type ServerSort = "default" | "ping" | "name";
 export type RouteTarget = "proxy" | "direct";
 export type AppRouteAction = RouteTarget | "block";
 
+export type RuleType = "process" | "domain" | "ip_cidr";
+export type ProcessMatcher = "name" | "path";
+export type DomainMatcher = "suffix" | "exact" | "keyword" | "regex";
+
+export interface RouteRule {
+  id: string;
+  enabled: boolean;
+  ruleType: RuleType;
+  value: string;
+  processMatcher?: ProcessMatcher;
+  domainMatcher?: DomainMatcher;
+  action: AppRouteAction;
+  description?: string;
+}
+
+export interface RunningProcess {
+  pid: number;
+  name: string;
+  title?: string | null;
+  path?: string | null;
+}
+
 export interface AppRouteRule {
   id: string;
   processName: string;
@@ -151,8 +173,10 @@ export interface Settings {
   bypassRu: boolean;
   /** fallback for traffic that did not match an application or geo rule */
   routeDefault: RouteTarget;
-  /** per-process split-tunnelling rules, evaluated before generic routes */
-  appRoutes: AppRouteRule[];
+  /** unified routing rules (process, domain, ip_cidr) */
+  routingRules: RouteRule[];
+  /** legacy per-process split-tunnelling rules */
+  appRoutes?: AppRouteRule[];
   tunStack: "mixed" | "system" | "gvisor";
   tunStrictRoute: boolean;
   tunMtu: number;
@@ -277,6 +301,8 @@ export interface Commands {
 
   ping_servers: { args: { ids: string[] }; result: null };
   url_test_active: { args: Record<string, never>; result: number };
+
+  get_running_processes: { args: Record<string, never>; result: RunningProcess[] };
 
   get_core_status: { args: Record<string, never>; result: CoreStatus };
   check_core_update: { args: Record<string, never>; result: UpdateCheck };

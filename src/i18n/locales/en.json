@@ -144,10 +144,44 @@
   },
   "routing": {
     "title": "Routing",
-    "add": "Add application",
+    "add": "Add rule",
+    "edit": "Edit rule",
     "delete": "Delete rule",
-    "ruleCount_one": "{{count}} application rule",
-    "ruleCount_other": "{{count}} application rules",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "search": "Filter by value or description…",
+    "ruleCount_one": "{{count}} rule",
+    "ruleCount_other": "{{count}} rules",
+    "types": {
+      "all": "All",
+      "process": "Processes",
+      "domain": "Domains",
+      "ip_cidr": "IP & Subnets"
+    },
+    "typeBadges": {
+      "process": "Process",
+      "processName": "Process Name",
+      "processPath": "Process Path",
+      "domainSuffix": "Domain Suffix",
+      "domainExact": "Exact Domain",
+      "domainKeyword": "Domain Keyword",
+      "domainRegex": "Domain Regex",
+      "ipCidr": "IP / CIDR"
+    },
+    "matchers": {
+      "suffix": "Suffix (*.domain)",
+      "exact": "Exact match",
+      "keyword": "Keyword",
+      "regex": "Regular expression",
+      "processName": "Executable name",
+      "processPath": "Full executable path"
+    },
+    "matcherHints": {
+      "suffix": "Matches the domain and all its subdomains (e.g. youtube.com covers www.youtube.com)",
+      "exact": "Matches only the exact domain name without subdomains",
+      "keyword": "Matches if the keyword is contained anywhere in the hostname",
+      "regex": "Matches hostnames using a sing-box regular expression"
+    },
     "actions": {
       "proxy": "Proxy",
       "direct": "Direct",
@@ -160,21 +194,58 @@
     },
     "default": {
       "title": "Other traffic",
-      "hint": "Route for applications without a dedicated rule"
+      "hint": "Default route for connections without a dedicated rule"
     },
-    "tunNotice": "Full application control requires TUN mode. System proxy only sees programs that use the Windows proxy settings.",
+    "tunNotice": "Process filtering requires TUN mode. Domain and IP rules work in all modes.",
     "openMode": "Choose mode",
     "reconnectNotice": "Rules are saved. Reconnect to apply them to the current connection.",
     "reconnect": "Reconnect",
     "empty": {
-      "title": "No application rules",
-      "hint": "Every application uses the route for other traffic"
+      "title": "No routing rules",
+      "hint": "All traffic follows the default routing rule"
+    },
+    "emptyFiltered": {
+      "title": "No rules found",
+      "hint": "Try adjusting your search query or switching tabs"
     },
     "addModal": {
-      "title": "Add application",
-      "process": "Process name",
-      "placeholder": "for example, chrome.exe",
-      "chooseExe": "Choose an EXE file",
+      "title": "Add routing rule",
+      "editTitle": "Edit routing rule",
+      "tabs": {
+        "process": "Process",
+        "domain": "Domain",
+        "ip_cidr": "IP / CIDR"
+      },
+      "process": {
+        "title": "Select a running process or specify an EXE",
+        "runningTitle": "Running processes",
+        "searchRunning": "Search running processes…",
+        "refreshRunning": "Refresh list",
+        "loadingRunning": "Fetching processes…",
+        "noRunning": "No processes found",
+        "select": "Select",
+        "manualLabel": "Executable file name",
+        "manualPlaceholder": "e.g. telegram.exe",
+        "pathLabel": "Full executable path",
+        "pathPlaceholder": "e.g. C:\\Program Files\\App\\app.exe",
+        "chooseExe": "Choose EXE from disk",
+        "descriptionLabel": "Description (optional)",
+        "descriptionPlaceholder": "e.g. Telegram Messenger"
+      },
+      "domain": {
+        "label": "Domain or keyword",
+        "placeholder": "e.g. example.com",
+        "matcherLabel": "Matcher type",
+        "descriptionLabel": "Description (optional)",
+        "descriptionPlaceholder": "e.g. Official website"
+      },
+      "ip": {
+        "label": "IP address or CIDR subnet",
+        "placeholder": "e.g. 1.1.1.1 or 104.16.0.0/12",
+        "invalid": "Enter a valid IPv4/IPv6 address or CIDR subnet (e.g. 1.1.1.1 or 10.0.0.0/8)",
+        "descriptionLabel": "Description (optional)",
+        "descriptionPlaceholder": "e.g. Cloudflare DNS"
+      },
       "action": "Route"
     }
   },

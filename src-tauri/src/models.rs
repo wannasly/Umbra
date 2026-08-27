@@ -50,6 +50,62 @@ pub struct AppRouteRule {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleType {
+    Process,
+    Domain,
+    IpCidr,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessMatcher {
+    Name,
+    Path,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DomainMatcher {
+    Suffix,
+    Exact,
+    Keyword,
+    Regex,
+}
+
+pub fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RouteRule {
+    pub id: String,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    pub rule_type: RuleType,
+    pub value: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_matcher: Option<ProcessMatcher>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain_matcher: Option<DomainMatcher>,
+    pub action: AppRouteAction,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningProcess {
+    pub pid: u32,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ConnStatus {
     Disconnected,
@@ -331,8 +387,8 @@ impl IpStrategy {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Settings {
     pub version: u32,
     pub language: String,
@@ -348,8 +404,12 @@ pub struct Settings {
     pub bypass_ru: bool,
     /// Fallback for traffic that did not match an application or geo rule.
     pub route_default: RouteTarget,
-    /// Per-process split-tunnelling rules, evaluated before generic routes.
+    /// Legacy per-process split-tunnelling rules (for backwards compatibility).
+    #[serde(default)]
     pub app_routes: Vec<AppRouteRule>,
+    /// Per-application / domain / IP-CIDR routing rules.
+    #[serde(default)]
+    pub routing_rules: Vec<RouteRule>,
     pub tun_stack: String,
     pub tun_strict_route: bool,
     pub tun_mtu: u32,
@@ -396,6 +456,7 @@ impl Default for Settings {
             bypass_ru: false,
             route_default: RouteTarget::Proxy,
             app_routes: Vec::new(),
+            routing_rules: Vec::new(),
             tun_stack: "mixed".into(),
             tun_strict_route: true,
             tun_mtu: 9000,
@@ -412,6 +473,143 @@ impl Default for Settings {
             proxy_owned: false,
             proxy_backup: ProxyBackup::default(),
         }
+    }
+}
+
+impl Settings {
+    pub fn normalize(&mut self) {
+        if self.routing_rules.is_empty() && !self.app_routes.is_empty() {
+            self.routing_rules = self
+                .app_routes
+                .iter()
+                .map(|ar| RouteRule {
+                    id: ar.id.clone(),
+                    enabled: true,
+                    rule_type: RuleType::Process,
+                    value: ar.process_name.clone(),
+                    process_matcher: Some(ProcessMatcher::Name),
+                    domain_matcher: None,
+                    action: ar.action,
+                    description: None,
+                })
+                .collect();
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Settings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase", default)]
+        struct SettingsHelper {
+            version: u32,
+            language: String,
+            accent: String,
+            mode: Mode,
+            mixed_port: u16,
+            selected_server_id: Option<String>,
+            autostart: bool,
+            start_minimized: bool,
+            minimize_to_tray: bool,
+            connect_on_startup: bool,
+            log_level: String,
+            bypass_ru: bool,
+            route_default: RouteTarget,
+            app_routes: Vec<AppRouteRule>,
+            routing_rules: Vec<RouteRule>,
+            tun_stack: String,
+            tun_strict_route: bool,
+            tun_mtu: u32,
+            discord_voice_direct: bool,
+            ip_strategy: IpStrategy,
+            ping_url: String,
+            reduce_motion: bool,
+            server_sort: String,
+            collapsed_groups: Vec<String>,
+            github_mirror: String,
+            sub_user_agent: String,
+            send_hwid: bool,
+            hwid: String,
+            proxy_owned: bool,
+            proxy_backup: ProxyBackup,
+        }
+
+        impl Default for SettingsHelper {
+            fn default() -> Self {
+                let s = Settings::default();
+                Self {
+                    version: s.version,
+                    language: s.language,
+                    accent: s.accent,
+                    mode: s.mode,
+                    mixed_port: s.mixed_port,
+                    selected_server_id: s.selected_server_id,
+                    autostart: s.autostart,
+                    start_minimized: s.start_minimized,
+                    minimize_to_tray: s.minimize_to_tray,
+                    connect_on_startup: s.connect_on_startup,
+                    log_level: s.log_level,
+                    bypass_ru: s.bypass_ru,
+                    route_default: s.route_default,
+                    app_routes: s.app_routes,
+                    routing_rules: s.routing_rules,
+                    tun_stack: s.tun_stack,
+                    tun_strict_route: s.tun_strict_route,
+                    tun_mtu: s.tun_mtu,
+                    discord_voice_direct: s.discord_voice_direct,
+                    ip_strategy: s.ip_strategy,
+                    ping_url: s.ping_url,
+                    reduce_motion: s.reduce_motion,
+                    server_sort: s.server_sort,
+                    collapsed_groups: s.collapsed_groups,
+                    github_mirror: s.github_mirror,
+                    sub_user_agent: s.sub_user_agent,
+                    send_hwid: s.send_hwid,
+                    hwid: s.hwid,
+                    proxy_owned: s.proxy_owned,
+                    proxy_backup: s.proxy_backup,
+                }
+            }
+        }
+
+        let raw = SettingsHelper::deserialize(deserializer)?;
+        let mut settings = Settings {
+            version: raw.version,
+            language: raw.language,
+            accent: raw.accent,
+            mode: raw.mode,
+            mixed_port: raw.mixed_port,
+            selected_server_id: raw.selected_server_id,
+            autostart: raw.autostart,
+            start_minimized: raw.start_minimized,
+            minimize_to_tray: raw.minimize_to_tray,
+            connect_on_startup: raw.connect_on_startup,
+            log_level: raw.log_level,
+            bypass_ru: raw.bypass_ru,
+            route_default: raw.route_default,
+            app_routes: raw.app_routes,
+            routing_rules: raw.routing_rules,
+            tun_stack: raw.tun_stack,
+            tun_strict_route: raw.tun_strict_route,
+            tun_mtu: raw.tun_mtu,
+            discord_voice_direct: raw.discord_voice_direct,
+            ip_strategy: raw.ip_strategy,
+            ping_url: raw.ping_url,
+            reduce_motion: raw.reduce_motion,
+            server_sort: raw.server_sort,
+            collapsed_groups: raw.collapsed_groups,
+            github_mirror: raw.github_mirror,
+            sub_user_agent: raw.sub_user_agent,
+            send_hwid: raw.send_hwid,
+            hwid: raw.hwid,
+            proxy_owned: raw.proxy_owned,
+            proxy_backup: raw.proxy_backup,
+        };
+        settings.normalize();
+        Ok(settings)
     }
 }
 
@@ -522,5 +720,115 @@ mod tests {
         assert_eq!(val["insecure"], true);
         assert_eq!(val["sni"], "hy2.example.com");
         assert!(val.get("kind").is_none());
+    }
+
+    #[test]
+    fn settings_legacy_app_routes_migration() {
+        let legacy_json = json!({
+            "version": 1,
+            "language": "en",
+            "appRoutes": [
+                {
+                    "id": "r1",
+                    "processName": "chrome.exe",
+                    "action": "proxy"
+                },
+                {
+                    "id": "r2",
+                    "processName": "discord.exe",
+                    "action": "direct"
+                }
+            ]
+        });
+
+        let settings: Settings = serde_json::from_value(legacy_json).unwrap();
+        assert_eq!(settings.routing_rules.len(), 2);
+        assert_eq!(settings.routing_rules[0].id, "r1");
+        assert_eq!(settings.routing_rules[0].rule_type, RuleType::Process);
+        assert_eq!(settings.routing_rules[0].value, "chrome.exe");
+        assert_eq!(settings.routing_rules[0].action, AppRouteAction::Proxy);
+        assert!(settings.routing_rules[0].enabled);
+        assert_eq!(settings.routing_rules[1].id, "r2");
+        assert_eq!(settings.routing_rules[1].rule_type, RuleType::Process);
+        assert_eq!(settings.routing_rules[1].value, "discord.exe");
+        assert_eq!(settings.routing_rules[1].action, AppRouteAction::Direct);
+    }
+
+    #[test]
+    fn settings_routing_rules_deserialization() {
+        let json_val = json!({
+            "version": 1,
+            "routingRules": [
+                {
+                    "id": "rule-1",
+                    "enabled": false,
+                    "ruleType": "domain",
+                    "value": "example.com",
+                    "domainMatcher": "suffix",
+                    "action": "block",
+                    "description": "Block ads"
+                },
+                {
+                    "id": "rule-2",
+                    "ruleType": "ip_cidr",
+                    "value": "10.0.0.0/8",
+                    "action": "direct"
+                }
+            ]
+        });
+
+        let settings: Settings = serde_json::from_value(json_val).unwrap();
+        assert_eq!(settings.routing_rules.len(), 2);
+        assert_eq!(settings.routing_rules[0].id, "rule-1");
+        assert!(!settings.routing_rules[0].enabled);
+        assert_eq!(settings.routing_rules[0].rule_type, RuleType::Domain);
+        assert_eq!(settings.routing_rules[0].value, "example.com");
+        assert_eq!(
+            settings.routing_rules[0].domain_matcher,
+            Some(DomainMatcher::Suffix)
+        );
+        assert_eq!(settings.routing_rules[0].action, AppRouteAction::Block);
+        assert_eq!(
+            settings.routing_rules[0].description.as_deref(),
+            Some("Block ads")
+        );
+
+        assert_eq!(settings.routing_rules[1].id, "rule-2");
+        assert!(settings.routing_rules[1].enabled); // default true
+        assert_eq!(settings.routing_rules[1].rule_type, RuleType::IpCidr);
+        assert_eq!(settings.routing_rules[1].value, "10.0.0.0/8");
+        assert_eq!(settings.routing_rules[1].action, AppRouteAction::Direct);
+    }
+
+    #[test]
+    fn settings_deserializes_explicit_process_path_and_domain_regex() {
+        let json_val = json!({
+            "routingRules": [
+                {
+                    "id": "path-rule",
+                    "ruleType": "process",
+                    "processMatcher": "path",
+                    "value": "C:\\Games\\game.exe",
+                    "action": "direct"
+                },
+                {
+                    "id": "regex-rule",
+                    "ruleType": "domain",
+                    "domainMatcher": "regex",
+                    "value": "^api\\d+\\.example\\.com$",
+                    "action": "proxy"
+                }
+            ]
+        });
+
+        let settings: Settings = serde_json::from_value(json_val).unwrap();
+        assert_eq!(
+            settings.routing_rules[0].process_matcher,
+            Some(ProcessMatcher::Path)
+        );
+        assert_eq!(
+            settings.routing_rules[1].domain_matcher,
+            Some(DomainMatcher::Regex)
+        );
     }
 }

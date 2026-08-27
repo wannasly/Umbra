@@ -108,6 +108,7 @@ pub fn run() {
             commands::settings::open_data_dir,
             commands::settings::is_elevated,
             commands::settings::relaunch_elevated,
+            commands::processes::get_running_processes,
             commands::profiles::import_share_links,
             commands::profiles::list_servers,
             commands::profiles::remove_server,

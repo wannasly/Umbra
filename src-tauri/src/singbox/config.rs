@@ -7,8 +7,8 @@ use serde_json::{json, Map, Value};
 
 use crate::error::{AppError, AppResult};
 use crate::models::{
-    AppRouteAction, Mode, ProxyKind, ProxyNode, RouteTarget, Security, ServerEntry, Settings,
-    Transport,
+    AppRouteAction, DomainMatcher, Mode, ProcessMatcher, ProxyKind, ProxyNode, RouteTarget,
+    RuleType, Security, ServerEntry, Settings, Transport,
 };
 
 /// Outbound tags that always exist in the generated config; server tags must
@@ -278,23 +278,98 @@ fn route(settings: &Settings) -> Value {
         json!({ "action": "sniff" }),
         json!({ "protocol": "dns", "action": "hijack-dns" }),
     ];
-    for rule in &settings.app_routes {
-        let process_name = rule.process_name.trim();
-        if process_name.is_empty() {
-            continue;
-        }
-        rules.push(match rule.action {
-            AppRouteAction::Proxy => {
-                json!({ "process_name": [process_name], "outbound": "proxy" })
-            }
-            AppRouteAction::Direct => {
-                json!({ "process_name": [process_name], "outbound": "direct" })
-            }
-            AppRouteAction::Block => {
-                json!({ "process_name": [process_name], "action": "reject" })
-            }
-        });
-    }
+    let user_rules: Vec<Value> = if !settings.routing_rules.is_empty() {
+        settings
+            .routing_rules
+            .iter()
+            .filter(|r| r.enabled)
+            .filter_map(|r| {
+                let val = r.value.trim();
+                if val.is_empty() {
+                    return None;
+                }
+                let mut map = Map::new();
+                match r.rule_type {
+                    RuleType::Process => {
+                        let matcher = r.process_matcher.unwrap_or_else(|| {
+                            if val.contains('\\') || val.contains('/') {
+                                ProcessMatcher::Path
+                            } else {
+                                ProcessMatcher::Name
+                            }
+                        });
+                        match matcher {
+                            ProcessMatcher::Name => {
+                                map.insert("process_name".into(), json!([val]));
+                            }
+                            ProcessMatcher::Path => {
+                                map.insert("process_path".into(), json!([val]));
+                            }
+                        }
+                    }
+                    RuleType::Domain => {
+                        let matcher = r.domain_matcher.unwrap_or(DomainMatcher::Suffix);
+                        match matcher {
+                            DomainMatcher::Suffix => {
+                                let clean = val.trim_start_matches('*').trim_start_matches('.');
+                                if clean.is_empty() {
+                                    return None;
+                                }
+                                map.insert("domain_suffix".into(), json!([clean]));
+                            }
+                            DomainMatcher::Exact => {
+                                map.insert("domain".into(), json!([val]));
+                            }
+                            DomainMatcher::Keyword => {
+                                map.insert("domain_keyword".into(), json!([val]));
+                            }
+                            DomainMatcher::Regex => {
+                                map.insert("domain_regex".into(), json!([val]));
+                            }
+                        }
+                    }
+                    RuleType::IpCidr => {
+                        map.insert("ip_cidr".into(), json!([val]));
+                    }
+                }
+                match r.action {
+                    AppRouteAction::Proxy => {
+                        map.insert("outbound".into(), json!("proxy"));
+                    }
+                    AppRouteAction::Direct => {
+                        map.insert("outbound".into(), json!("direct"));
+                    }
+                    AppRouteAction::Block => {
+                        map.insert("action".into(), json!("reject"));
+                    }
+                }
+                Some(Value::Object(map))
+            })
+            .collect()
+    } else {
+        settings
+            .app_routes
+            .iter()
+            .filter_map(|rule| {
+                let process_name = rule.process_name.trim();
+                if process_name.is_empty() {
+                    return None;
+                }
+                Some(match rule.action {
+                    AppRouteAction::Proxy => {
+                        json!({ "process_name": [process_name], "outbound": "proxy" })
+                    }
+                    AppRouteAction::Direct => {
+                        json!({ "process_name": [process_name], "outbound": "direct" })
+                    }
+                    AppRouteAction::Block => {
+                        json!({ "process_name": [process_name], "action": "reject" })
+                    }
+                })
+            })
+            .collect()
+    };
+    rules.extend(user_rules);
     if settings.discord_voice_direct {
         // VLESS/Reality transports UDP inside TCP (XUDP). A bulk TCP download
         // can therefore delay Discord's real-time packets by seconds. Bypass
@@ -358,6 +433,8 @@ fn route(settings: &Settings) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{AppRouteAction, DomainMatcher, ProcessMatcher, RouteRule, RuleType};
+    use std::path::Path;
 
     fn entry(id: &str, name: &str) -> ServerEntry {
         ServerEntry {
@@ -819,6 +896,199 @@ mod tests {
                 String::from_utf8_lossy(&out.stderr)
             );
             let _ = std::fs::remove_file(&cfg_path);
+        }
+    }
+
+    #[test]
+    fn routing_rules_all_variants_and_actions() {
+        let servers = vec![entry("a", "S")];
+        let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
+        settings.routing_rules = vec![
+            RouteRule {
+                id: "r1".into(),
+                enabled: true,
+                rule_type: RuleType::Process,
+                value: "chrome.exe".into(),
+                process_matcher: Some(ProcessMatcher::Name),
+                domain_matcher: None,
+                action: AppRouteAction::Proxy,
+                description: None,
+            },
+            RouteRule {
+                id: "r2".into(),
+                enabled: true,
+                rule_type: RuleType::Process,
+                value: r"C:\Games\Game\game.exe".into(),
+                process_matcher: Some(ProcessMatcher::Path),
+                domain_matcher: None,
+                action: AppRouteAction::Direct,
+                description: None,
+            },
+            RouteRule {
+                id: "r3".into(),
+                enabled: true,
+                rule_type: RuleType::Domain,
+                value: "*.youtube.com".into(),
+                process_matcher: None,
+                domain_matcher: Some(DomainMatcher::Suffix),
+                action: AppRouteAction::Proxy,
+                description: None,
+            },
+            RouteRule {
+                id: "r4".into(),
+                enabled: true,
+                rule_type: RuleType::Domain,
+                value: "api.example.com".into(),
+                process_matcher: None,
+                domain_matcher: Some(DomainMatcher::Exact),
+                action: AppRouteAction::Direct,
+                description: None,
+            },
+            RouteRule {
+                id: "r5".into(),
+                enabled: true,
+                rule_type: RuleType::Domain,
+                value: "tracker".into(),
+                process_matcher: None,
+                domain_matcher: Some(DomainMatcher::Keyword),
+                action: AppRouteAction::Block,
+                description: None,
+            },
+            RouteRule {
+                id: "r6".into(),
+                enabled: true,
+                rule_type: RuleType::IpCidr,
+                value: "1.1.1.1/32".into(),
+                process_matcher: None,
+                domain_matcher: None,
+                action: AppRouteAction::Proxy,
+                description: None,
+            },
+            RouteRule {
+                id: "r7".into(),
+                enabled: false, // disabled rule should be omitted
+                rule_type: RuleType::Domain,
+                value: "disabled.com".into(),
+                process_matcher: None,
+                domain_matcher: Some(DomainMatcher::Exact),
+                action: AppRouteAction::Block,
+                description: None,
+            },
+        ];
+
+        let cfg = gen(&settings, &servers, "a");
+        let rules = at(&cfg, "/route/rules").as_array().expect("rules");
+        assert_eq!(
+            rules[2],
+            json!({ "process_name": ["chrome.exe"], "outbound": "proxy" })
+        );
+        assert_eq!(
+            rules[3],
+            json!({ "process_path": [r"C:\Games\Game\game.exe"], "outbound": "direct" })
+        );
+        assert_eq!(
+            rules[4],
+            json!({ "domain_suffix": ["youtube.com"], "outbound": "proxy" })
+        );
+        assert_eq!(
+            rules[5],
+            json!({ "domain": ["api.example.com"], "outbound": "direct" })
+        );
+        assert_eq!(
+            rules[6],
+            json!({ "domain_keyword": ["tracker"], "action": "reject" })
+        );
+        assert_eq!(
+            rules[7],
+            json!({ "ip_cidr": ["1.1.1.1/32"], "outbound": "proxy" })
+        );
+        // rule 8 is ip_is_private
+        assert_eq!(
+            rules[8],
+            json!({ "ip_is_private": true, "outbound": "direct" })
+        );
+
+        let candidate_paths = [
+            Path::new("resources/sing-box.exe"),
+            Path::new("src-tauri/resources/sing-box.exe"),
+            Path::new("../resources/sing-box.exe"),
+        ];
+        if let Some(core) = candidate_paths.iter().find(|p| p.exists()) {
+            let tmp_dir = std::env::temp_dir();
+            let cfg_path = tmp_dir.join("test_routing_rules_cfg.json");
+            std::fs::write(&cfg_path, serde_json::to_string_pretty(&cfg.json).unwrap()).unwrap();
+            let mut cmd = std::process::Command::new(core);
+            cmd.arg("check").arg("-c").arg(&cfg_path);
+            let out = cmd.output().expect("failed to execute sing-box check");
+            assert!(
+                out.status.success(),
+                "sing-box check failed for routing rules config: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
+            let _ = std::fs::remove_file(&cfg_path);
+        }
+    }
+
+    #[test]
+    fn explicit_process_path_and_domain_regex_use_sing_box_fields() {
+        let servers = vec![entry("a", "S")];
+        let mut settings = Settings::default();
+        settings.discord_voice_direct = false;
+        settings.routing_rules = vec![
+            RouteRule {
+                id: "path".into(),
+                enabled: true,
+                rule_type: RuleType::Process,
+                value: r"C:\Games\game.exe".into(),
+                process_matcher: Some(ProcessMatcher::Path),
+                domain_matcher: None,
+                action: AppRouteAction::Direct,
+                description: None,
+            },
+            RouteRule {
+                id: "regex".into(),
+                enabled: true,
+                rule_type: RuleType::Domain,
+                value: r"^api\d+\.example\.com$".into(),
+                process_matcher: None,
+                domain_matcher: Some(DomainMatcher::Regex),
+                action: AppRouteAction::Proxy,
+                description: None,
+            },
+        ];
+
+        let cfg = gen(&settings, &servers, "a");
+        let rules = at(&cfg, "/route/rules").as_array().expect("rules");
+        assert_eq!(
+            rules[2],
+            json!({ "process_path": [r"C:\Games\game.exe"], "outbound": "direct" })
+        );
+        assert_eq!(
+            rules[3],
+            json!({ "domain_regex": [r"^api\d+\.example\.com$"], "outbound": "proxy" })
+        );
+
+        let candidate_paths = [
+            Path::new("resources/sing-box.exe"),
+            Path::new("src-tauri/resources/sing-box.exe"),
+            Path::new("../resources/sing-box.exe"),
+        ];
+        if let Some(core) = candidate_paths.iter().find(|path| path.exists()) {
+            let cfg_path = std::env::temp_dir().join("umbra-routing-regex-check.json");
+            std::fs::write(&cfg_path, serde_json::to_string_pretty(&cfg.json).unwrap()).unwrap();
+            let out = std::process::Command::new(core)
+                .arg("check")
+                .arg("-c")
+                .arg(&cfg_path)
+                .output()
+                .expect("failed to execute sing-box check");
+            let _ = std::fs::remove_file(&cfg_path);
+            assert!(
+                out.status.success(),
+                "sing-box check failed for process path/domain regex config: {}",
+                String::from_utf8_lossy(&out.stderr)
+            );
         }
     }
 }

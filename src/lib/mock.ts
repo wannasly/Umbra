@@ -5,6 +5,7 @@ import type {
   ConnectionState,
   LogLine,
   ProxyNodeVless,
+  RunningProcess,
   ServerEntry,
   ServersList,
   Settings,
@@ -166,6 +167,51 @@ const mockSubscription2: Subscription = {
 
 const mockSubscriptions = [mockSubscription, mockSubscription2];
 
+const mockRunningProcesses: RunningProcess[] = [
+  {
+    pid: 10420,
+    name: "chrome.exe",
+    title: "Google Chrome",
+    path: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+  },
+  {
+    pid: 14288,
+    name: "Discord.exe",
+    title: "Discord",
+    path: "C:\\Users\\dev\\AppData\\Local\\Discord\\app-1.0.9160\\Discord.exe",
+  },
+  {
+    pid: 8392,
+    name: "Telegram.exe",
+    title: "Telegram Desktop",
+    path: "C:\\Users\\dev\\AppData\\Roaming\\Telegram Desktop\\Telegram.exe",
+  },
+  {
+    pid: 5612,
+    name: "steam.exe",
+    title: "Steam",
+    path: "C:\\Program Files (x86)\\Steam\\steam.exe",
+  },
+  {
+    pid: 12044,
+    name: "Spotify.exe",
+    title: "Spotify Free",
+    path: "C:\\Users\\dev\\AppData\\Roaming\\Spotify\\Spotify.exe",
+  },
+  {
+    pid: 4892,
+    name: "firefox.exe",
+    title: "Mozilla Firefox",
+    path: "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+  },
+  {
+    pid: 7720,
+    name: "Code.exe",
+    title: "Visual Studio Code",
+    path: "C:\\Users\\dev\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+  },
+];
+
 const state: {
   conn: ConnectionState;
   settings: Settings;
@@ -193,6 +239,49 @@ const state: {
     logLevel: "info",
     bypassRu: false,
     routeDefault: "proxy",
+    routingRules: [
+      {
+        id: "rule-proc-1",
+        enabled: true,
+        ruleType: "process",
+        value: "chrome.exe",
+        processMatcher: "name",
+        action: "proxy",
+        description: "Google Chrome",
+      },
+      {
+        id: "rule-dom-1",
+        enabled: true,
+        ruleType: "domain",
+        value: "youtube.com",
+        domainMatcher: "suffix",
+        action: "proxy",
+      },
+      {
+        id: "rule-dom-2",
+        enabled: true,
+        ruleType: "domain",
+        value: "rutracker.org",
+        domainMatcher: "suffix",
+        action: "proxy",
+      },
+      {
+        id: "rule-ip-1",
+        enabled: true,
+        ruleType: "ip_cidr",
+        value: "1.1.1.1/32",
+        action: "proxy",
+        description: "Cloudflare DNS",
+      },
+      {
+        id: "rule-proc-2",
+        enabled: false,
+        ruleType: "process",
+        value: "game.exe",
+        processMatcher: "name",
+        action: "direct",
+      },
+    ],
     appRoutes: [
       { id: "mock-browser", processName: "firefox.exe", action: "proxy" },
       { id: "mock-game", processName: "game.exe", action: "direct" },
@@ -401,6 +490,8 @@ export async function mockInvoke(cmd: string, args?: unknown): Promise<unknown> 
     }
     case "url_test_active":
       return 47;
+    case "get_running_processes":
+      return mockRunningProcesses;
     case "get_core_status":
       return { installed: true, version: "1.13.14", path: "C:\\Users\\dev\\AppData\\Roaming\\com.umbra.proxy\\bin\\sing-box.exe" };
     case "check_core_update":
