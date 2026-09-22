@@ -883,20 +883,104 @@ mod tests {
             Path::new("src-tauri/resources/sing-box.exe"),
             Path::new("../resources/sing-box.exe"),
         ];
-        if let Some(core) = candidate_paths.iter().find(|p| p.exists()) {
-            let tmp_dir = std::env::temp_dir();
-            let cfg_path = tmp_dir.join("test_hy2_cfg.json");
-            std::fs::write(&cfg_path, cfg.json.to_string()).unwrap();
-            let mut cmd = std::process::Command::new(core);
-            cmd.arg("check").arg("-c").arg(&cfg_path);
-            let out = cmd.output().expect("failed to execute sing-box check");
-            assert!(
-                out.status.success(),
-                "sing-box check failed for Hysteria2: {}",
-                String::from_utf8_lossy(&out.stderr)
-            );
-            let _ = std::fs::remove_file(&cfg_path);
-        }
+        let core = candidate_paths
+            .iter()
+            .find(|p| p.exists())
+            .expect("sing-box.exe binary must exist to check generated config");
+
+        let tmp_dir = std::env::temp_dir();
+        let cfg_path = tmp_dir.join("test_hy2_cfg.json");
+        std::fs::write(&cfg_path, cfg.json.to_string()).unwrap();
+        let mut cmd = std::process::Command::new(core);
+        cmd.arg("check").arg("-c").arg(&cfg_path);
+        let out = cmd.output().expect("failed to execute sing-box check");
+        assert!(
+            out.status.success(),
+            "sing-box check failed for Hysteria2: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let _ = std::fs::remove_file(&cfg_path);
+    }
+
+    #[test]
+    fn test_singbox_check_vless_tcp_grpc_reality() {
+        use std::path::Path;
+        let tcp_node = ProxyNode {
+            id: "tcp-1".into(),
+            name: "NL-1 TCP Reality".into(),
+            server: "nl1.example.com".into(),
+            port: 443,
+            last_ping_ms: None,
+            favorite: false,
+            total_up: 0,
+            total_down: 0,
+            raw: "".into(),
+            kind: ProxyKind::Vless(crate::models::VlessNode {
+                uuid: "b831381d-6324-4d53-ad4f-8cda48b30811".into(),
+                flow: "xtls-rprx-vision".into(),
+                security: Security::Reality,
+                sni: "yahoo.com".into(),
+                fingerprint: "chrome".into(),
+                public_key: "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc".into(),
+                short_id: "6ba85179".into(),
+                insecure: false,
+                alpn: vec![],
+                transport: Transport::Tcp,
+            }),
+        };
+
+        let grpc_node = ProxyNode {
+            id: "grpc-1".into(),
+            name: "NL-2 gRPC Reality".into(),
+            server: "nl2.example.com".into(),
+            port: 7443,
+            last_ping_ms: None,
+            favorite: false,
+            total_up: 0,
+            total_down: 0,
+            raw: "".into(),
+            kind: ProxyKind::Vless(crate::models::VlessNode {
+                uuid: "b831381d-6324-4d53-ad4f-8cda48b30811".into(),
+                flow: "".into(),
+                security: Security::Reality,
+                sni: "yahoo.com".into(),
+                fingerprint: "firefox".into(),
+                public_key: "SbVKOEMjK0sIlbwg4akyBg5mL5KZwwB-ed4eEE7YnRc".into(),
+                short_id: "6ba85179".into(),
+                insecure: false,
+                alpn: vec![],
+                transport: Transport::Grpc {
+                    service_name: "grpc-svc".into(),
+                },
+            }),
+        };
+
+        let servers = vec![tcp_node, grpc_node];
+        let refs: Vec<&ProxyNode> = servers.iter().collect();
+        let cfg = generate(&Settings::default(), &refs, "tcp-1", 9091, "secret2").unwrap();
+
+        let candidate_paths = [
+            Path::new("resources/sing-box.exe"),
+            Path::new("src-tauri/resources/sing-box.exe"),
+            Path::new("../resources/sing-box.exe"),
+        ];
+        let core = candidate_paths
+            .iter()
+            .find(|p| p.exists())
+            .expect("sing-box.exe binary must exist to check generated config");
+
+        let tmp_dir = std::env::temp_dir();
+        let cfg_path = tmp_dir.join("test_vless_reality_cfg.json");
+        std::fs::write(&cfg_path, cfg.json.to_string()).unwrap();
+        let mut cmd = std::process::Command::new(core);
+        cmd.arg("check").arg("-c").arg(&cfg_path);
+        let out = cmd.output().expect("failed to execute sing-box check");
+        assert!(
+            out.status.success(),
+            "sing-box check failed for VLESS Reality: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let _ = std::fs::remove_file(&cfg_path);
     }
 
     #[test]

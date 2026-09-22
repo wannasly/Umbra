@@ -117,7 +117,12 @@ pub async fn import_share_links(
     state: tauri::State<'_, AppState>,
     text: String,
 ) -> AppResult<ImportResult> {
-    let (parsed, errors) = parser::parse_links(&text);
+    let trimmed = text.trim_start_matches('\u{feff}').trim();
+    let (parsed, errors) = if trimmed.starts_with('[') {
+        parser::v2ray_json::parse_v2ray_json(trimmed)
+    } else {
+        parser::parse_links(&text)
+    };
     let mut profiles = state.profiles.write().await;
     let existing: HashSet<String> = profiles.manual.iter().map(|s| s.raw.clone()).collect();
     let mut added = 0;

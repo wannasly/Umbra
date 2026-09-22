@@ -1,6 +1,7 @@
 //! Share-link parsing: scheme dispatch + bulk import helper.
 
 pub mod hysteria2;
+pub mod v2ray_json;
 pub mod vless;
 
 use std::collections::HashSet;

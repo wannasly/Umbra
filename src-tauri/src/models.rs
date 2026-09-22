@@ -494,6 +494,9 @@ impl Settings {
                 })
                 .collect();
         }
+        if self.sub_user_agent.starts_with("v2rayN/7.13 Umbra/") || self.sub_user_agent.trim().is_empty() {
+            self.sub_user_agent = crate::subscription::DEFAULT_SUB_USER_AGENT.into();
+        }
     }
 }
 

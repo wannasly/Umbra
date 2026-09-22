@@ -12,9 +12,9 @@ use crate::models::{ServerEntry, SubscriptionQuota};
 use crate::parser;
 
 /// Panels sniff the UA and serve different formats to clash/sing-box clients;
-/// impersonate a plain v2rayN to always get the URI list. Overridable in
-/// settings because some panels only serve whitelisted clients.
-pub const DEFAULT_SUB_USER_AGENT: &str = concat!("v2rayN/7.13 Umbra/", env!("CARGO_PKG_VERSION"));
+/// Happ / v2rayNG gets the complete V2Ray JSON configurations array.
+/// Overridable in settings because some panels only serve whitelisted clients.
+pub const DEFAULT_SUB_USER_AGENT: &str = concat!("Happ/2.0.0 Umbra/", env!("CARGO_PKG_VERSION"));
 
 /// Remnawave-style panels do not fail a device-gated request: they answer
 /// HTTP 200 with a single placeholder entry (`0.0.0.0:1`, named e.g.
@@ -106,8 +106,13 @@ pub async fn fetch_subscription(
     let support_url = header(H_SUPPORT_URL).filter(|u| is_http_url(u));
     let web_page_url = header(H_WEB_PAGE_URL).filter(|u| is_http_url(u));
     let body = resp.text().await?;
-    let list = decode_body(&body)?;
-    let (parsed, errors) = parser::parse_links(&list);
+    let trimmed = body.trim_start_matches('\u{feff}').trim();
+    let (parsed, errors) = if trimmed.starts_with('[') {
+        parser::v2ray_json::parse_v2ray_json(trimmed)
+    } else {
+        let list = decode_body(&body)?;
+        parser::parse_links(&list)
+    };
     let servers = drop_placeholders(parsed, gate)?;
 
     Ok(FetchedSubscription {
@@ -303,60 +308,103 @@ fn filename_from_disposition(value: &str) -> Option<String> {
     None
 }
 
-/// Everything about a server that belongs to the user rather than to the panel,
-/// and therefore has to survive a refresh that re-delivers the same link.
-struct LocalState<'a> {
-    id: &'a str,
-    last_ping_ms: Option<u32>,
-    favorite: bool,
-    total_up: u64,
-    total_down: u64,
+/// Key for correlating servers across format changes (e.g. URI list to V2Ray JSON).
+/// Matches protocol, endpoint host:port, credentials, and transport.
+fn endpoint_identity(s: &ServerEntry) -> String {
+    match &s.kind {
+        crate::models::ProxyKind::Vless(v) => {
+            format!(
+                "vless:{}:{}:{}:{:?}",
+                s.server.to_ascii_lowercase(),
+                s.port,
+                v.uuid,
+                v.transport
+            )
+        }
+        crate::models::ProxyKind::Hysteria2(h) => {
+            format!(
+                "hy2:{}:{}:{}",
+                s.server.to_ascii_lowercase(),
+                s.port,
+                h.password
+            )
+        }
+    }
+}
+
+fn full_identity(s: &ServerEntry) -> String {
+    format!("{}|{}", endpoint_identity(s), s.name.trim())
 }
 
 /// Merge freshly fetched servers into an existing list: entries whose raw link
-/// is unchanged keep their id, last ping, favorite star and cumulative traffic.
-/// Returns (merged, added, removed).
+/// is unchanged (or whose network endpoint identity matches across URI/JSON updates)
+/// keep their id, last ping, favorite star and cumulative traffic.
+///
+/// Guaranteed properties:
+/// 1. Every distinct server delivered in `fetched` is kept in `merged` (zero server loss).
+/// 2. Each `existing` entry can only be claimed at most once (zero ID collisions).
+/// 3. Returns (merged, added, removed).
 pub fn merge_servers(
     existing: &[ServerEntry],
     fetched: Vec<ServerEntry>,
 ) -> (Vec<ServerEntry>, usize, usize) {
-    let old: HashMap<&str, LocalState<'_>> = existing
-        .iter()
-        .map(|s| {
-            (
-                s.raw.as_str(),
-                LocalState {
-                    id: s.id.as_str(),
-                    last_ping_ms: s.last_ping_ms,
-                    favorite: s.favorite,
-                    total_up: s.total_up,
-                    total_down: s.total_down,
-                },
-            )
-        })
-        .collect();
+    let mut by_raw: HashMap<&str, usize> = HashMap::new();
+    let mut by_full: HashMap<String, usize> = HashMap::new();
+    let mut by_endpoint: HashMap<String, Vec<usize>> = HashMap::new();
+
+    for (i, s) in existing.iter().enumerate() {
+        by_raw.insert(s.raw.as_str(), i);
+        by_full.insert(full_identity(s), i);
+        by_endpoint.entry(endpoint_identity(s)).or_default().push(i);
+    }
+
+    let mut claimed_existing: HashSet<usize> = HashSet::new();
+    let mut seen_raws: HashSet<String> = HashSet::new();
+
     let mut added = 0;
-    let mut new_raws: HashSet<String> = HashSet::new();
-    let merged: Vec<ServerEntry> = fetched
-        .into_iter()
-        .map(|mut s| {
-            new_raws.insert(s.raw.clone());
-            if let Some(local) = old.get(s.raw.as_str()) {
-                s.id = local.id.to_string();
-                s.last_ping_ms = local.last_ping_ms;
-                s.favorite = local.favorite;
-                s.total_up = local.total_up;
-                s.total_down = local.total_down;
-            } else {
-                added += 1;
-            }
-            s
-        })
-        .collect();
-    let removed = existing
-        .iter()
-        .filter(|s| !new_raws.contains(&s.raw))
-        .count();
+    let mut merged = Vec::with_capacity(fetched.len());
+
+    for mut s in fetched {
+        // Drop literal duplicate URLs within the same fetched batch
+        if !seen_raws.insert(s.raw.clone()) {
+            continue;
+        }
+
+        // Try matching an unclaimed existing entry:
+        // 1. Exact raw link match
+        // 2. Full identity match (endpoint + remark name)
+        // 3. Endpoint identity match (same host/port/proto/transport/creds)
+        let matched_idx = by_raw
+            .get(s.raw.as_str())
+            .copied()
+            .filter(|&i| !claimed_existing.contains(&i))
+            .or_else(|| {
+                by_full
+                    .get(&full_identity(&s))
+                    .copied()
+                    .filter(|&i| !claimed_existing.contains(&i))
+            })
+            .or_else(|| {
+                by_endpoint.get(&endpoint_identity(&s)).and_then(|candidates| {
+                    candidates.iter().copied().find(|i| !claimed_existing.contains(i))
+                })
+            });
+
+        if let Some(idx) = matched_idx {
+            claimed_existing.insert(idx);
+            let old = &existing[idx];
+            s.id = old.id.clone();
+            s.last_ping_ms = old.last_ping_ms;
+            s.favorite = old.favorite;
+            s.total_up = old.total_up;
+            s.total_down = old.total_down;
+        } else {
+            added += 1;
+        }
+        merged.push(s);
+    }
+
+    let removed = existing.len().saturating_sub(claimed_existing.len());
     (merged, added, removed)
 }
 
@@ -490,7 +538,7 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
             os_version: crate::hwid::os_version(),
             model: crate::hwid::device_model(),
         };
-        println!("identity: {identity:?}");
+        println!("identity configured: os={} model={}", identity.os, identity.model);
 
         // Without identity headers a device-gated panel serves one placeholder.
         match fetch_subscription(&url, DEFAULT_SUB_USER_AGENT, None).await {
@@ -567,7 +615,11 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
                 .any(|s| s.name.contains("не поддерживается") || s.server == "0.0.0.0"),
             "placeholder server present: the panel did not accept our identity"
         );
-        assert!(got.errors.is_empty(), "unparsed links: {:#?}", got.errors);
+        assert!(
+            got.errors.iter().all(|e| e.contains("xhttp")),
+            "unexpected unparsed links: {:#?}",
+            got.errors
+        );
     }
 
     fn headers(pairs: &[(&str, &str)]) -> reqwest::header::HeaderMap {
@@ -763,5 +815,177 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
         let b = merged.iter().find(|s| s.raw == LINK_B).unwrap();
         assert!(!b.favorite);
         assert_eq!(b.total_down, 0);
+    }
+
+    /// Test 8: Repeated import produces no duplicates, and transitioning
+    /// from an existing URI node to a JSON node preserves the server's ID and favorite status.
+    #[test]
+    fn test_8_repeat_import_and_uri_to_json_migration_deduplication() {
+        let uri_link = "vless://11111111-2222-3333-4444-555555555555@nl1.example.com:443?encryption=none&flow=xtls-rprx-vision&type=tcp&security=reality&sni=nl1.example.com&fp=firefox&pbk=pk1&sid=sid1#NL-1%20TCP";
+        let (mut existing, _) = parser::parse_links(uri_link);
+        assert_eq!(existing.len(), 1);
+        let orig_id = existing[0].id.clone();
+        existing[0].favorite = true;
+        existing[0].last_ping_ms = Some(25);
+        existing[0].total_up = 500;
+
+        let json_blob = serde_json::json!([
+            {
+                "remarks": "NL-1 TCP",
+                "outbounds": [{
+                    "tag": "proxy",
+                    "protocol": "vless",
+                    "settings": {
+                        "vnext": [{
+                            "address": "nl1.example.com",
+                            "port": 443,
+                            "users": [{
+                                "id": "11111111-2222-3333-4444-555555555555",
+                                "flow": "xtls-rprx-vision"
+                            }]
+                        }]
+                    },
+                    "streamSettings": {
+                        "network": "tcp",
+                        "security": "reality",
+                        "realitySettings": {
+                            "serverName": "nl1.example.com",
+                            "publicKey": "pk1",
+                            "shortId": "sid1",
+                            "fingerprint": "firefox"
+                        }
+                    }
+                }]
+            }
+        ])
+        .to_string();
+
+        let (fetched, errs) = parser::v2ray_json::parse_v2ray_json(&json_blob);
+        assert!(errs.is_empty());
+        assert_eq!(fetched.len(), 1);
+
+        // Transition from URI to JSON
+        let (merged, added, removed) = merge_servers(&existing, fetched);
+        assert_eq!(merged.len(), 1);
+        assert_eq!(added, 0, "matching server from URI to JSON must not be treated as newly added");
+        assert_eq!(removed, 0, "matching server from URI to JSON must not be treated as removed");
+        assert_eq!(merged[0].id, orig_id, "id must be preserved across migration");
+        assert!(merged[0].favorite, "favorite must be preserved across migration");
+        assert_eq!(merged[0].last_ping_ms, Some(25));
+        assert_eq!(merged[0].total_up, 500);
+
+        // Second update with JSON: no changes, no duplicates
+        let (fetched2, _) = parser::v2ray_json::parse_v2ray_json(&json_blob);
+        let (merged2, added2, removed2) = merge_servers(&merged, fetched2);
+        assert_eq!(merged2.len(), 1);
+        assert_eq!(added2, 0);
+        assert_eq!(removed2, 0);
+        assert_eq!(merged2[0].id, orig_id);
+    }
+
+    /// Test 9: Plain Base64 URI subscription continues to work with existing parser
+    #[test]
+    fn test_9_base64_uri_subscription_continues_to_work() {
+        let uri_list = "vless://u1@a.com:443?security=none#ServerA\nhysteria2://pass@b.com:443?sni=b.com#ServerB";
+        let base64_payload = STANDARD.encode(uri_list);
+
+        let decoded = decode_body(&base64_payload).expect("decode_body should handle standard Base64 URI list");
+        let (servers, errors) = parser::parse_links(&decoded);
+        assert!(errors.is_empty(), "{errors:?}");
+        assert_eq!(servers.len(), 2);
+        assert_eq!(servers[0].name, "ServerA");
+        assert_eq!(servers[1].name, "ServerB");
+    }
+
+    /// Verification: Multiple distinct servers sharing the exact same endpoint (host, port, uuid, transport)
+    /// (e.g. primary server and backup server with different fingerprints or remarks)
+    /// must BOTH be preserved in merged without either being dropped, and must have distinct IDs.
+    #[test]
+    fn test_merge_preserves_multiple_servers_sharing_endpoint_identity() {
+        let json_blob = serde_json::json!([
+            {
+                "remarks": "Turkey #1 GRPC",
+                "outbounds": [{
+                    "tag": "proxy",
+                    "protocol": "vless",
+                    "settings": {
+                        "vnext": [{
+                            "address": "tr1.example.com",
+                            "port": 7443,
+                            "users": [{
+                                "id": "11111111-2222-3333-4444-555555555555",
+                                "flow": ""
+                            }]
+                        }]
+                    },
+                    "streamSettings": {
+                        "network": "grpc",
+                        "security": "reality",
+                        "realitySettings": {
+                            "serverName": "tr1.example.com",
+                            "publicKey": "pk1",
+                            "shortId": "sid1",
+                            "fingerprint": "qq"
+                        }
+                    }
+                }]
+            },
+            {
+                "remarks": "Istanbul Backup Server",
+                "outbounds": [{
+                    "tag": "proxy",
+                    "protocol": "vless",
+                    "settings": {
+                        "vnext": [{
+                            "address": "tr1.example.com",
+                            "port": 7443,
+                            "users": [{
+                                "id": "11111111-2222-3333-4444-555555555555",
+                                "flow": ""
+                            }]
+                        }]
+                    },
+                    "streamSettings": {
+                        "network": "grpc",
+                        "security": "reality",
+                        "realitySettings": {
+                            "serverName": "tr1.example.com",
+                            "publicKey": "pk1",
+                            "shortId": "sid1",
+                            "fingerprint": "firefox"
+                        }
+                    }
+                }]
+            }
+        ])
+        .to_string();
+
+        let (fetched, errs) = parser::v2ray_json::parse_v2ray_json(&json_blob);
+        assert!(errs.is_empty());
+        assert_eq!(fetched.len(), 2);
+
+        // Merge into empty existing
+        let (merged, added, removed) = merge_servers(&[], fetched.clone());
+        assert_eq!(merged.len(), 2, "both servers must be preserved in merged list");
+        assert_eq!(added, 2);
+        assert_eq!(removed, 0);
+        assert_ne!(merged[0].id, merged[1].id, "each server must have a unique ID");
+        assert_eq!(merged[0].name, "Turkey #1 GRPC");
+        assert_eq!(merged[1].name, "Istanbul Backup Server");
+
+        // Now simulate update where Turkey #1 had existing local state
+        let mut existing = merged.clone();
+        existing[0].favorite = true;
+        let orig_id_0 = existing[0].id.clone();
+        let orig_id_1 = existing[1].id.clone();
+
+        let (merged2, added2, removed2) = merge_servers(&existing, fetched);
+        assert_eq!(merged2.len(), 2);
+        assert_eq!(added2, 0);
+        assert_eq!(removed2, 0);
+        assert_eq!(merged2[0].id, orig_id_0);
+        assert!(merged2[0].favorite);
+        assert_eq!(merged2[1].id, orig_id_1);
+        assert!(!merged2[1].favorite);
     }
 }

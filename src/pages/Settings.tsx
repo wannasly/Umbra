@@ -54,7 +54,7 @@ const ACCENTS: { value: Accent; from: string; to: string }[] = [
 ];
 
 /** Must stay in sync with Settings::default().sub_user_agent on the Rust side. */
-const DEFAULT_SUB_USER_AGENT = `v2rayN/7.13 Umbra/${APP_VERSION}`;
+const DEFAULT_SUB_USER_AGENT = `Happ/2.0.0 Umbra/${APP_VERSION}`;
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (

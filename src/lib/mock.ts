@@ -297,7 +297,7 @@ const state: {
     serverSort: "default",
     collapsedGroups: [],
     githubMirror: "",
-    subUserAgent: `v2rayN/7.13 Umbra/${APP_VERSION}`,
+    subUserAgent: `Happ/2.0.0 Umbra/${APP_VERSION}`,
     sendHwid: true,
     hwid: "a1b2c3d4e5f60718293a4b5c6d7e8f90",
   },
