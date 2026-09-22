@@ -23,13 +23,21 @@ fn contains_word(text: &str, word: &str) -> bool {
         let before_ok = if abs_idx == 0 {
             true
         } else {
-            !text[..abs_idx].chars().next_back().unwrap().is_ascii_alphanumeric()
+            !text[..abs_idx]
+                .chars()
+                .next_back()
+                .unwrap()
+                .is_ascii_alphanumeric()
         };
         let after_idx = abs_idx + word.len();
         let after_ok = if after_idx >= text.len() {
             true
         } else {
-            !text[after_idx..].chars().next().unwrap().is_ascii_alphanumeric()
+            !text[after_idx..]
+                .chars()
+                .next()
+                .unwrap()
+                .is_ascii_alphanumeric()
         };
         if before_ok && after_ok {
             return true;
@@ -131,7 +139,14 @@ pub fn is_info_entry(name: &str, server: &str, port: u16) -> bool {
 }
 
 const EXCLUDED_ROUTING: &[&str] = &[
-    "freedom", "direct", "blackhole", "block", "dns", "selector", "urltest", "balancer",
+    "freedom",
+    "direct",
+    "blackhole",
+    "block",
+    "dns",
+    "selector",
+    "urltest",
+    "balancer",
 ];
 
 fn is_excluded(proto: &str, tag: &str) -> bool {
@@ -163,7 +178,9 @@ fn select_outbound(outbounds: &[Value]) -> Option<&Value> {
             .map(|t| t.to_ascii_lowercase())
             .unwrap_or_default();
 
-        if !is_excluded(&proto, &tag) && matches!(proto.as_str(), "vless" | "hysteria" | "hysteria2") {
+        if !is_excluded(&proto, &tag)
+            && matches!(proto.as_str(), "vless" | "hysteria" | "hysteria2")
+        {
             return Some(proxy);
         }
     }
@@ -198,12 +215,7 @@ fn enc(s: &str) -> String {
     utf8_percent_encode(s, NON_ALPHANUMERIC).to_string()
 }
 
-pub fn build_canonical_vless_uri(
-    server: &str,
-    port: u16,
-    name: &str,
-    node: &VlessNode,
-) -> String {
+pub fn build_canonical_vless_uri(server: &str, port: u16, name: &str, node: &VlessNode) -> String {
     let mut query = Vec::new();
 
     match &node.transport {
@@ -294,7 +306,10 @@ pub fn build_canonical_vless_uri(
         server.to_string()
     };
 
-    format!("vless://{}@{}:{}{}{}", node.uuid, host_formatted, port, query_str, frag)
+    format!(
+        "vless://{}@{}:{}{}{}",
+        node.uuid, host_formatted, port, query_str, frag
+    )
 }
 
 pub fn build_canonical_hysteria2_uri(
@@ -338,7 +353,10 @@ pub fn build_canonical_hysteria2_uri(
     };
 
     let auth_encoded = enc(&node.password);
-    format!("hysteria2://{}@{}:{}{}{}", auth_encoded, host_formatted, port, query_str, frag)
+    format!(
+        "hysteria2://{}@{}:{}{}{}",
+        auth_encoded, host_formatted, port, query_str, frag
+    )
 }
 
 fn parse_port_val(v: Option<&Value>) -> Option<u16> {
@@ -356,7 +374,11 @@ fn parse_vless_outbound(remarks: &str, outbound: &Value) -> AppResult<ServerEntr
     let settings = outbound.get("settings").unwrap_or(&Value::Null);
 
     // Host & port: settings.vnext[0].address or settings.address
-    let (server, port, uuid, flow) = if let Some(vnext) = settings.get("vnext").and_then(|v| v.as_array()).and_then(|arr| arr.first()) {
+    let (server, port, uuid, flow) = if let Some(vnext) = settings
+        .get("vnext")
+        .and_then(|v| v.as_array())
+        .and_then(|arr| arr.first())
+    {
         let address = vnext
             .get("address")
             .and_then(|a| a.as_str())
@@ -471,80 +493,105 @@ fn parse_vless_outbound(remarks: &str, outbound: &Value) -> AppResult<ServerEntr
         .unwrap_or("none")
         .to_ascii_lowercase();
 
-    let (security, sni, fingerprint, public_key, short_id, insecure, alpn) = match security_param.as_str() {
-        "reality" => {
-            let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
-            let raw_sni = reality
-                .get("serverName")
-                .and_then(|s| s.as_str())
-                .unwrap_or_default();
-            let sni = if raw_sni.is_empty() && server.parse::<IpAddr>().is_err() {
-                server.clone()
-            } else {
-                raw_sni.to_string()
-            };
-            let pbk = reality
-                .get("publicKey")
-                .and_then(|k| k.as_str())
-                .unwrap_or_default();
-            if pbk.is_empty() {
-                return Err(AppError::Parse("reality link is missing pbk".into()));
+    let (security, sni, fingerprint, public_key, short_id, insecure, alpn) =
+        match security_param.as_str() {
+            "reality" => {
+                let reality = stream.get("realitySettings").unwrap_or(&Value::Null);
+                let raw_sni = reality
+                    .get("serverName")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or_default();
+                let sni = if raw_sni.is_empty() && server.parse::<IpAddr>().is_err() {
+                    server.clone()
+                } else {
+                    raw_sni.to_string()
+                };
+                let pbk = reality
+                    .get("publicKey")
+                    .and_then(|k| k.as_str())
+                    .unwrap_or_default();
+                if pbk.is_empty() {
+                    return Err(AppError::Parse("reality link is missing pbk".into()));
+                }
+                let fp = reality
+                    .get("fingerprint")
+                    .and_then(|f| f.as_str())
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or("chrome")
+                    .to_string();
+                let sid = reality
+                    .get("shortId")
+                    .and_then(|s| s.as_str())
+                    .or_else(|| {
+                        reality
+                            .get("shortIds")
+                            .and_then(|arr| arr.as_array())
+                            .and_then(|a| a.first())
+                            .and_then(|s| s.as_str())
+                    })
+                    .unwrap_or_default()
+                    .to_string();
+                (
+                    Security::Reality,
+                    sni,
+                    fp,
+                    pbk.to_string(),
+                    sid,
+                    false,
+                    Vec::new(),
+                )
             }
-            let fp = reality
-                .get("fingerprint")
-                .and_then(|f| f.as_str())
-                .filter(|f| !f.is_empty())
-                .unwrap_or("chrome")
-                .to_string();
-            let sid = reality
-                .get("shortId")
-                .and_then(|s| s.as_str())
-                .or_else(|| {
-                    reality
-                        .get("shortIds")
-                        .and_then(|arr| arr.as_array())
-                        .and_then(|a| a.first())
-                        .and_then(|s| s.as_str())
-                })
-                .unwrap_or_default()
-                .to_string();
-            (Security::Reality, sni, fp, pbk.to_string(), sid, false, Vec::new())
-        }
-        "tls" => {
-            let tls = stream.get("tlsSettings").unwrap_or(&Value::Null);
-            let raw_sni = tls
-                .get("serverName")
-                .and_then(|s| s.as_str())
-                .unwrap_or_default();
-            let sni = if raw_sni.is_empty() && server.parse::<IpAddr>().is_err() {
-                server.clone()
-            } else {
-                raw_sni.to_string()
-            };
-            let fp = tls
-                .get("fingerprint")
-                .and_then(|f| f.as_str())
-                .unwrap_or_default()
-                .to_string();
-            let insecure = tls
-                .get("allowInsecure")
-                .or_else(|| tls.get("insecure"))
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
-            let alpn = tls
-                .get("alpn")
-                .and_then(|a| a.as_array())
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str().map(String::from))
-                        .collect()
-                })
-                .unwrap_or_default();
-            (Security::Tls, sni, fp, String::new(), String::new(), insecure, alpn)
-        }
-        "none" => (Security::None, String::new(), String::new(), String::new(), String::new(), false, Vec::new()),
-        other => return Err(AppError::Unsupported(format!("security \"{other}\""))),
-    };
+            "tls" => {
+                let tls = stream.get("tlsSettings").unwrap_or(&Value::Null);
+                let raw_sni = tls
+                    .get("serverName")
+                    .and_then(|s| s.as_str())
+                    .unwrap_or_default();
+                let sni = if raw_sni.is_empty() && server.parse::<IpAddr>().is_err() {
+                    server.clone()
+                } else {
+                    raw_sni.to_string()
+                };
+                let fp = tls
+                    .get("fingerprint")
+                    .and_then(|f| f.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let insecure = tls
+                    .get("allowInsecure")
+                    .or_else(|| tls.get("insecure"))
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(false);
+                let alpn = tls
+                    .get("alpn")
+                    .and_then(|a| a.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                (
+                    Security::Tls,
+                    sni,
+                    fp,
+                    String::new(),
+                    String::new(),
+                    insecure,
+                    alpn,
+                )
+            }
+            "none" => (
+                Security::None,
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                false,
+                Vec::new(),
+            ),
+            other => return Err(AppError::Unsupported(format!("security \"{other}\""))),
+        };
 
     // Flow is only valid for tcp
     let flow = if transport == Transport::Tcp {
@@ -861,7 +908,9 @@ mod tests {
         assert_eq!(s.server, "nl1.example.com");
         assert_eq!(s.port, 443);
 
-        let ProxyKind::Vless(v) = &s.kind else { panic!("not vless") };
+        let ProxyKind::Vless(v) = &s.kind else {
+            panic!("not vless")
+        };
         assert_eq!(v.uuid, "11111111-2222-3333-4444-555555555555");
         assert_eq!(v.flow, "xtls-rprx-vision");
         assert_eq!(v.security, Security::Reality);
@@ -921,7 +970,9 @@ mod tests {
         assert_eq!(s.server, "se2.example.com");
         assert_eq!(s.port, 7443);
 
-        let ProxyKind::Vless(v) = &s.kind else { panic!("not vless") };
+        let ProxyKind::Vless(v) = &s.kind else {
+            panic!("not vless")
+        };
         assert_eq!(v.uuid, "22222222-2222-3333-4444-555555555555");
         assert_eq!(v.flow, "");
         assert_eq!(v.security, Security::Reality);
@@ -975,7 +1026,9 @@ mod tests {
         assert_eq!(s.server, "hy.example.com");
         assert_eq!(s.port, 6443);
 
-        let ProxyKind::Hysteria2(h) = &s.kind else { panic!("not hysteria2") };
+        let ProxyKind::Hysteria2(h) = &s.kind else {
+            panic!("not hysteria2")
+        };
         assert_eq!(h.password, "secret-pass");
         assert_eq!(h.sni, "hy.example.com");
         assert_eq!(h.alpn, vec!["h3"]);
@@ -1184,7 +1237,11 @@ mod tests {
         .to_string();
 
         let (servers, _) = parse_v2ray_json(&json_input);
-        assert_eq!(servers.len(), 1, "identical raw links in same batch must be deduplicated");
+        assert_eq!(
+            servers.len(),
+            1,
+            "identical raw links in same batch must be deduplicated"
+        );
     }
 
     #[test]
@@ -1204,11 +1261,15 @@ mod tests {
         let uri = build_canonical_vless_uri("nl.example.com", 443, "NL-1", &vless_node);
         let parsed = crate::parser::vless::VlessParser;
         use crate::parser::LinkParser;
-        let entry = parsed.parse(&uri).expect("canonical vless URI should parse");
+        let entry = parsed
+            .parse(&uri)
+            .expect("canonical vless URI should parse");
         assert_eq!(entry.server, "nl.example.com");
         assert_eq!(entry.port, 443);
         assert_eq!(entry.name, "NL-1");
-        let ProxyKind::Vless(v) = entry.kind else { panic!("not vless") };
+        let ProxyKind::Vless(v) = entry.kind else {
+            panic!("not vless")
+        };
         assert_eq!(v.uuid, vless_node.uuid);
         assert_eq!(v.public_key, vless_node.public_key);
 
@@ -1223,11 +1284,15 @@ mod tests {
         };
         let uri_hy2 = build_canonical_hysteria2_uri("hy.example.com", 6443, "Hy-1", &hy2_node);
         let parsed_hy2 = crate::parser::hysteria2::Hysteria2Parser;
-        let entry_hy2 = parsed_hy2.parse(&uri_hy2).expect("canonical hy2 URI should parse");
+        let entry_hy2 = parsed_hy2
+            .parse(&uri_hy2)
+            .expect("canonical hy2 URI should parse");
         assert_eq!(entry_hy2.server, "hy.example.com");
         assert_eq!(entry_hy2.port, 6443);
         assert_eq!(entry_hy2.name, "Hy-1");
-        let ProxyKind::Hysteria2(h) = entry_hy2.kind else { panic!("not hy2") };
+        let ProxyKind::Hysteria2(h) = entry_hy2.kind else {
+            panic!("not hy2")
+        };
         assert_eq!(h.password, hy2_node.password);
         assert_eq!(h.sni, hy2_node.sni);
     }
@@ -1249,7 +1314,9 @@ mod tests {
         let uri = build_canonical_vless_uri("2001:db8::1", 443, "IPv6 Node", &vless_node);
         assert!(uri.contains("@[2001:db8::1]:443"));
         use crate::parser::LinkParser;
-        let parsed = crate::parser::vless::VlessParser.parse(&uri).expect("IPv6 URI must be valid");
+        let parsed = crate::parser::vless::VlessParser
+            .parse(&uri)
+            .expect("IPv6 URI must be valid");
         assert_eq!(parsed.server, "2001:db8::1");
     }
 
@@ -1298,7 +1365,9 @@ mod tests {
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(servers.len(), 1);
         assert_eq!(servers[0].port, 8443);
-        let ProxyKind::Vless(v) = &servers[0].kind else { panic!("not vless") };
+        let ProxyKind::Vless(v) = &servers[0].kind else {
+            panic!("not vless")
+        };
         assert_eq!(v.short_id, "sid_from_array");
     }
 }

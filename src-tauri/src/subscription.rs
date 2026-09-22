@@ -385,9 +385,14 @@ pub fn merge_servers(
                     .filter(|&i| !claimed_existing.contains(&i))
             })
             .or_else(|| {
-                by_endpoint.get(&endpoint_identity(&s)).and_then(|candidates| {
-                    candidates.iter().copied().find(|i| !claimed_existing.contains(i))
-                })
+                by_endpoint
+                    .get(&endpoint_identity(&s))
+                    .and_then(|candidates| {
+                        candidates
+                            .iter()
+                            .copied()
+                            .find(|i| !claimed_existing.contains(i))
+                    })
             });
 
         if let Some(idx) = matched_idx {
@@ -538,7 +543,10 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
             os_version: crate::hwid::os_version(),
             model: crate::hwid::device_model(),
         };
-        println!("identity configured: os={} model={}", identity.os, identity.model);
+        println!(
+            "identity configured: os={} model={}",
+            identity.os, identity.model
+        );
 
         // Without identity headers a device-gated panel serves one placeholder.
         match fetch_subscription(&url, DEFAULT_SUB_USER_AGENT, None).await {
@@ -867,10 +875,22 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
         // Transition from URI to JSON
         let (merged, added, removed) = merge_servers(&existing, fetched);
         assert_eq!(merged.len(), 1);
-        assert_eq!(added, 0, "matching server from URI to JSON must not be treated as newly added");
-        assert_eq!(removed, 0, "matching server from URI to JSON must not be treated as removed");
-        assert_eq!(merged[0].id, orig_id, "id must be preserved across migration");
-        assert!(merged[0].favorite, "favorite must be preserved across migration");
+        assert_eq!(
+            added, 0,
+            "matching server from URI to JSON must not be treated as newly added"
+        );
+        assert_eq!(
+            removed, 0,
+            "matching server from URI to JSON must not be treated as removed"
+        );
+        assert_eq!(
+            merged[0].id, orig_id,
+            "id must be preserved across migration"
+        );
+        assert!(
+            merged[0].favorite,
+            "favorite must be preserved across migration"
+        );
         assert_eq!(merged[0].last_ping_ms, Some(25));
         assert_eq!(merged[0].total_up, 500);
 
@@ -889,7 +909,8 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
         let uri_list = "vless://u1@a.com:443?security=none#ServerA\nhysteria2://pass@b.com:443?sni=b.com#ServerB";
         let base64_payload = STANDARD.encode(uri_list);
 
-        let decoded = decode_body(&base64_payload).expect("decode_body should handle standard Base64 URI list");
+        let decoded = decode_body(&base64_payload)
+            .expect("decode_body should handle standard Base64 URI list");
         let (servers, errors) = parser::parse_links(&decoded);
         assert!(errors.is_empty(), "{errors:?}");
         assert_eq!(servers.len(), 2);
@@ -966,10 +987,17 @@ vless://u1@d.com:443?security=reality&pbk=k4&type=xhttp&mode=packet-up#FI-4\n";
 
         // Merge into empty existing
         let (merged, added, removed) = merge_servers(&[], fetched.clone());
-        assert_eq!(merged.len(), 2, "both servers must be preserved in merged list");
+        assert_eq!(
+            merged.len(),
+            2,
+            "both servers must be preserved in merged list"
+        );
         assert_eq!(added, 2);
         assert_eq!(removed, 0);
-        assert_ne!(merged[0].id, merged[1].id, "each server must have a unique ID");
+        assert_ne!(
+            merged[0].id, merged[1].id,
+            "each server must have a unique ID"
+        );
         assert_eq!(merged[0].name, "Turkey #1 GRPC");
         assert_eq!(merged[1].name, "Istanbul Backup Server");
 
