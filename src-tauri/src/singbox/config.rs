@@ -401,7 +401,7 @@ fn route(settings: &Settings) -> Value {
                     "type": "remote",
                     "format": "binary",
                     "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ru.srs",
-                    "download_detour": "proxy",
+                    "download_detour": "direct",
                     "update_interval": "7d"
                 },
                 {
@@ -409,7 +409,7 @@ fn route(settings: &Settings) -> Value {
                     "type": "remote",
                     "format": "binary",
                     "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-ru.srs",
-                    "download_detour": "proxy",
+                    "download_detour": "direct",
                     "update_interval": "7d"
                 }
             ]),
@@ -645,7 +645,7 @@ mod tests {
             "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-category-ru.srs"
         );
         assert_eq!(rs[1]["tag"], "geoip-ru");
-        assert_eq!(rs[1]["download_detour"], "proxy");
+        assert_eq!(rs[1]["download_detour"], "direct");
         assert_eq!(rs[1]["update_interval"], "7d");
     }
 

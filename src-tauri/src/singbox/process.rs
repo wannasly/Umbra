@@ -39,6 +39,7 @@ const HEALTHY_RESET: Duration = Duration::from_secs(60);
 /// passed — a busy inbound port, a missing wintun.dll, a refused adapter —
 /// fails inside this window.
 const STARTUP_CONFIRM: Duration = Duration::from_millis(1500);
+const STARTUP_TIMEOUT: Duration = Duration::from_secs(25);
 const STARTUP_POLL: Duration = Duration::from_millis(100);
 
 /// Clash-api readiness budget. It is *not* part of the connect path (see
@@ -270,6 +271,8 @@ struct RunCtx {
     work_dir: PathBuf,
     mode: Mode,
     mixed_port: u16,
+    clash_port: u16,
+    clash_secret: String,
 }
 
 // ---------------------------------------------------------------------------
@@ -312,9 +315,13 @@ pub async fn start(
         work_dir,
         mode,
         mixed_port,
+        clash_port: config.clash_port,
+        clash_secret: config.clash_secret.clone(),
     };
     let mut child = spawn_child(app, &ctx)?;
-    if let Err(e) = confirm_started(&mut child).await {
+    if let Err(e) =
+        confirm_started(&mut child, Some((config.clash_port, &config.clash_secret))).await
+    {
         graceful_kill(&mut child).await;
         state
             .logs
@@ -366,10 +373,19 @@ pub async fn start(
     Ok(())
 }
 
-/// Block only long enough to catch a core that dies on the spot. Anything
-/// still running after this window is a working core, however busy its api is.
-async fn confirm_started(child: &mut Child) -> AppResult<()> {
-    let deadline = Instant::now() + STARTUP_CONFIRM;
+/// Block long enough for the child to prove it is alive and genuinely ready.
+/// When clash-api coordinates are provided (`readiness`), polls `probe` so we
+/// only confirm the core once its services (inbounds, router, rule-sets) are
+/// actually serving, up to `STARTUP_TIMEOUT`. If the child exits early, fails
+/// immediately.
+/// When `readiness` is None (e.g. tests), confirms after `STARTUP_CONFIRM`.
+async fn confirm_started(child: &mut Child, readiness: Option<(u16, &str)>) -> AppResult<()> {
+    let deadline = Instant::now()
+        + if readiness.is_some() {
+            STARTUP_TIMEOUT
+        } else {
+            STARTUP_CONFIRM
+        };
     loop {
         match child.try_wait() {
             Ok(Some(status)) => {
@@ -387,8 +403,17 @@ async fn confirm_started(child: &mut Child) -> AppResult<()> {
                 )))
             }
         }
-        if Instant::now() >= deadline {
+        if let Some((port, secret)) = readiness {
+            if clash_api::probe(port, secret).await {
+                return Ok(());
+            }
+        } else if Instant::now() >= deadline {
             return Ok(());
+        }
+        if Instant::now() >= deadline {
+            return Err(AppError::CoreStartFailed(
+                "the core did not become ready in time — see Logs for details".into(),
+            ));
         }
         tokio::time::sleep(STARTUP_POLL).await;
     }
@@ -727,7 +752,7 @@ async fn respawn(app: &AppHandle, shared: &CoreShared, ctx: &RunCtx) -> AppResul
     let mut child = spawn_child(app, ctx)?;
     // Same rule as the initial start: a live process is a successful restart,
     // whether or not its clash api has caught up yet.
-    if let Err(e) = confirm_started(&mut child).await {
+    if let Err(e) = confirm_started(&mut child, Some((ctx.clash_port, &ctx.clash_secret))).await {
         graceful_kill(&mut child).await;
         return Err(e);
     }
@@ -953,7 +978,7 @@ mod tests {
         #[cfg(windows)]
         cmd.creation_flags(CREATE_NO_WINDOW);
         let mut child = cmd.spawn().expect("spawn helper");
-        let err = confirm_started(&mut child)
+        let err = confirm_started(&mut child, None)
             .await
             .expect_err("an immediate exit must fail the connect");
         assert_eq!(err.code(), "CORE_START_FAILED");
@@ -974,7 +999,7 @@ mod tests {
         cmd.creation_flags(CREATE_NO_WINDOW);
         let mut child = cmd.spawn().expect("spawn helper");
         let started = std::time::Instant::now();
-        let result = confirm_started(&mut child).await;
+        let result = confirm_started(&mut child, None).await;
         let _ = child.kill().await;
         assert!(result.is_ok(), "{result:?}");
         // the connect must not block on the clash api any more, only on the
