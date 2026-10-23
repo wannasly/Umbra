@@ -1578,7 +1578,7 @@ fn quota_text(q: SubscriptionQuota, ru: bool) -> String {
             result += &format!(
                 "   {} {}   {}",
                 if ru { "Истекает" } else { "Expires" },
-                date.format("%d.%m.%Y"),
+                date.with_timezone(&chrono::Local).format("%d.%m.%Y"),
                 if days <= 0 {
                     if ru {
                         "Истекла".into()

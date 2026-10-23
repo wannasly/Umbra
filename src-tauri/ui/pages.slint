@@ -64,7 +64,8 @@ component ServerItem inherits Rectangle {background:transparent;
             if root.item-data.selected: Rectangle { x:5px; y:5px; width:8px; height:8px; border-radius:4px; background:Theme.accent; }
         }
         Rectangle { x:46px; y:23px; width:28px; height:26px; background:#c4dfe60e; border-width:1px; border-color:Theme.border; border-radius:8px;
-            Image { x:5px; y:6px; width:18px; height:13px; source:root.item-data.flag; image-fit:contain; }
+            if root.item-data.flag.width>0: Image { x:5px; y:6px; width:18px; height:13px; source:root.item-data.flag; image-fit:contain; }
+            if root.item-data.flag.width==0: Icon {x:7px; y:6px; width:14px; height:14px; source:@image-url("icons/globe.svg"); }
         }
         HorizontalLayout { x:86px; y:12px; width:parent.width - 265px; height:24px; spacing:6px; alignment:start;
             Label {y:(parent.height - self.height)/2; text:root.item-data.name; font-size:15px; font-weight:600; }

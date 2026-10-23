@@ -32,9 +32,9 @@ export component MainWindow inherits Window {
         Label {width:parent.width - self.x;  x:44px; y:0px; height:44px; text:"Umbra"; color:Theme.dim; font-size:13px; font-weight:600; letter-spacing:1px; vertical-alignment:center; }
         TouchArea {x:0px; y:0px;  width:parent.width - 140px; mouse-cursor:default; pointer-event(e)=> { if e.kind==PointerEventKind.down { App.action("window-drag","",""); } } }
         HorizontalLayout { x:parent.width - 138px; y:4px; width:132px; height:36px; spacing:0px;
-            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/minus.svg"); clicked=> { App.action("window-minimize","",""); } }
-            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/square.svg"); clicked=> { App.action("window-maximize","",""); } }
-            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/close.svg"); clicked=> { App.action("window-close","",""); } }
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; enabled:App.modal==0; tip:App.ru?"Свернуть":"Minimize"; icon:@image-url("icons/minus.svg"); clicked=> { App.action("window-minimize","",""); } }
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; enabled:App.modal==0; tip:App.ru?"Развернуть":"Maximize"; icon:@image-url("icons/square.svg"); clicked=> { App.action("window-maximize","",""); } }
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; enabled:App.modal==0; tip:App.ru?"Закрыть":"Close"; icon:@image-url("icons/close.svg"); clicked=> { App.action("window-close","",""); } }
         }
     }
     nav := FocusScope {
