@@ -1,0 +1,307 @@
+import { ListView, ScrollView } from "std-widgets.slint";
+import { Theme, Label, Heading, Caption, Icon, Glass, Badge, Button, Field, Toggle, Choice, EmptyState } from "theme.slint";
+import { App, ServerRow, SubRow, RouteRow, SettingRow } from "data.slint";
+
+component PageHeader inherits Rectangle {background:transparent;
+    @children
+    in property<string> title;
+    in property<string> subtitle;
+    in property<string> button;
+    callback add;
+    height:56px;
+    Heading {width:parent.width - self.x; height:self.preferred-height; x:0px; y:root.width<650px?0px:2px; text:root.title; font-size:root.width<650px?19.2px:22px; }
+    Label {width:parent.width - self.x; height:self.preferred-height; x:0px;  y:33px; text:root.subtitle; color:Theme.faint; }
+    if root.button!="": Button {y:0px; x:parent.width - self.width; primary:true; text:root.button; icon:@image-url("icons/plus.svg"); clicked=> { root.add(); } }
+}
+
+component ServerItem inherits Rectangle {background:transparent;
+    in property<ServerRow> item-data;
+    property<bool> expanded-header:root.width<700px && root.item-data.quota!="";
+    height:root.item-data.group ? (root.expanded-header?128px:70px) : root.item-data.info ? 42px : 76px;
+    if root.item-data.group: Rectangle {x:0px; 
+        y:8px; height:root.expanded-header?112px:54px; width:parent.width;
+        background:#073b46f2; border-radius:12px; border-width:1px; border-color:Theme.control-border;
+        HorizontalLayout {y:0px; x:12px; width:parent.width - 24px; height:54px; spacing:8px;
+            Icon {y:(parent.height - self.height)/2; source:@image-url("icons/chevron.svg"); width:14px; height:14px; transform-rotation:root.item-data.collapsed ? -90deg : 0deg; }
+            Label {y:(parent.height - self.height)/2; text:root.item-data.name; color:Theme.accent; font-weight:600; letter-spacing:0.7px; }
+            Label {y:(parent.height - self.height)/2; text:root.item-data.count; color:Theme.faint; font-size:11px; }
+            Rectangle {y:(parent.height - self.height)/2; horizontal-stretch:1; background:transparent; }
+            if !root.expanded-header: Label {y:(parent.height - self.height)/2; text:root.item-data.quota; color:Theme.faint; font-size:10px; }
+            if root.item-data.movable && !root.expanded-header: Rectangle {y:(parent.height - self.height)/2; width:72px; background:transparent; }
+        }
+        if root.expanded-header: Label {x:12px; y:48px; width:parent.width - 24px; height:24px; text:root.item-data.quota; color:Theme.faint; font-size:10px; }
+        TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.action("collapse",root.item-data.group-id,""); } }
+        if root.item-data.movable: HorizontalLayout { x:root.expanded-header?12px:parent.width - 78px; y:root.expanded-header?76px:9px; width:72px; height:36px; spacing:0px;
+            Button {y:(parent.height - self.height)/2; width:36px; ghost:true; enabled:root.item-data.can-up; icon:@image-url("icons/up.svg"); clicked=> { App.action("sub-move",root.item-data.group-id,"-1"); } }
+            Button {y:(parent.height - self.height)/2; width:36px; ghost:true; enabled:root.item-data.can-down; icon:@image-url("icons/down.svg"); clicked=> { App.action("sub-move",root.item-data.group-id,"1"); } }
+        }
+    }
+    if root.item-data.info: Rectangle {x:0px; y:0px; width:parent.width; height:34px; background:transparent; border-width:1px; border-color:#c4dfe61a; border-radius:17px;
+        Icon {x:14px; y:10px; width:14px; height:14px; source:@image-url("icons/info.svg"); colorize:Theme.faint; }
+        Label {x:38px; y:0px; width:parent.width - 52px; height:34px; text:root.item-data.name; color:root.item-data.links.length>0?Theme.accent:Theme.dim; }
+        TouchArea {enabled:root.item-data.links.length>0; mouse-cursor:pointer; clicked=> { if root.item-data.links.length==1 { App.action("open-url","",root.item-data.links[0]); } else { notice-popup.show(); } } }
+        notice-popup := PopupWindow {x:0px; y:34px; width:min(420px,root.width); height:min(root.item-data.links.length*38px+12px,240px);
+            Glass {background:Theme.raised; border-radius:12px;
+                ListView {x:6px; y:6px; width:parent.width - 12px; height:parent.height - 12px; horizontal-scrollbar-policy:always-off;
+                    for url in root.item-data.links: FocusScope {height:38px; accessible-role:button; accessible-label:url;
+                        accessible-action-default=> { App.action("open-url","",url); notice-popup.close(); }
+                        key-pressed(e)=> { if e.text==" " || e.text=="\n" { App.action("open-url","",url); notice-popup.close(); return accept; } return reject; }
+                        Rectangle {width:parent.width; height:parent.height; background:link-touch.has-hover?Theme.hover:transparent; border-radius:8px; }
+                        Label {x:12px; y:0px; width:parent.width - 24px; height:parent.height; text:url; color:Theme.accent; }
+                        link-touch := TouchArea {mouse-cursor:pointer; clicked=> { App.action("open-url","",url); notice-popup.close(); } }
+                    }
+                }
+            }
+        }
+    }
+    if !root.item-data.group && !root.item-data.info: Glass {x:0px; y:0px; 
+        height:68px; width:parent.width;
+        background:root.item-data.selected ? Theme.selected : body.has-hover ? Theme.hover : Theme.panel;
+        border-color:root.item-data.selected ? Theme.selected-border : body.has-hover ? Theme.selected-border : Theme.border;
+        animate background,border-color { duration:Theme.reduce-motion?0ms:150ms; }
+        body := TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.action("select",root.item-data.id,""); } }
+        Rectangle { x:16px; y:25px; width:18px; height:18px; border-radius:9px; border-width:2px; border-color:root.item-data.selected?Theme.accent:Theme.control-border; background:transparent;
+            if root.item-data.selected: Rectangle { x:5px; y:5px; width:8px; height:8px; border-radius:4px; background:Theme.accent; }
+        }
+        Rectangle { x:46px; y:23px; width:28px; height:26px; background:#c4dfe60e; border-width:1px; border-color:Theme.border; border-radius:8px;
+            Image { x:5px; y:6px; width:18px; height:13px; source:root.item-data.flag; image-fit:contain; }
+        }
+        HorizontalLayout { x:86px; y:12px; width:parent.width - 265px; height:24px; spacing:6px; alignment:start;
+            Label {y:(parent.height - self.height)/2; text:root.item-data.name; font-size:15px; font-weight:600; }
+            if root.width>700px: Badge {y:(parent.height - self.height)/2;  text:root.item-data.protocol; }
+            if root.width>700px && root.item-data.security!="": Badge {y:(parent.height - self.height)/2;  text:root.item-data.security; }
+            if root.width>850px && root.item-data.transport!="": Badge {y:(parent.height - self.height)/2;  text:root.item-data.transport; }
+        }
+        Label {height:self.preferred-height; x:86px; y:39px; width:parent.width - (root.width<700px?110px:280px); text:root.item-data.host+(root.width<700px?"":"  "+root.item-data.traffic); font-family:"JetBrains Mono"; font-size:13px; color:Theme.dim; }
+        Button { x:parent.width - 184px; y:16px; width:36px; ghost:true; icon:root.item-data.favorite ? @image-url("icons/star-fill.svg") : @image-url("icons/star.svg"); icon-tint:root.item-data.favorite ? Theme.warn : Theme.faint; clicked=> { App.action("favorite",root.item-data.id,root.item-data.favorite?"false":"true"); }
+
+        }
+        Rectangle { x:parent.width - 132px; y:22px; width:68px; height:25px; border-radius:13px; border-width:1px; border-color:Theme.border; background:#c4dfe60a;
+            Label {width:parent.width - self.x; height:self.preferred-height; x:0px; y:0px;  text:root.item-data.ping; color:root.item-data.ping-tone; horizontal-alignment:center; vertical-alignment:center; font-family:"JetBrains Mono"; font-size:11px; }
+        }
+        Button { x:parent.width - 52px; y:16px; width:36px; ghost:true; tip:App.ru?"Действия с сервером":"Server actions"; icon:@image-url("icons/more.svg"); clicked=> { menu.show(); } }
+        menu := PopupWindow { x:parent.width - 240px; y:56px; width:240px;
+            Glass {background:Theme.raised; border-radius:12px;
+                VerticalLayout {padding:6px; spacing:2px;
+                    Button {text:App.ru?"Проверить задержку":"Test latency"; ghost:true; icon:@image-url("icons/bolt.svg"); clicked=> { App.action("ping",root.item-data.id,""); menu.close(); } }
+                    Button {text:App.ru?"Копировать ссылку":"Copy share link"; ghost:true; icon:@image-url("icons/copy.svg"); clicked=> { App.action("copy-server",root.item-data.id,""); menu.close(); } }
+                    if root.item-data.deletable: Button {text:App.ru?"Удалить":"Delete"; ghost:true; danger:true; icon:@image-url("icons/trash.svg"); clicked=> { App.action("delete-server-dialog",root.item-data.id,""); menu.close(); } }
+                }
+            }
+        }
+    }
+}
+
+export component ServersPage inherits Rectangle {
+    property<bool> narrow:root.width<650px;
+    width:100%; height:100%;x:0px; y:0px; 
+    background:transparent;
+    PageHeader {x:0px; y:0px; title:App.ru?"Серверы":"Servers"; subtitle:App.server-count; button:root.narrow?"":App.ru?"Добавить":"Add"; add=> { App.action("import-dialog","",""); }
+        HorizontalLayout { x:root.narrow?114px:parent.width - 456px; y:root.narrow?8px:0px; width:root.narrow?parent.width - 114px:330px; height:36px; spacing:12px;
+            Choice {y:(parent.height - self.height)/2; options:[App.ru?"По умолчанию":"Default",App.ru?"По задержке":"Latency",App.ru?"По имени":"Name"]; selected:App.sort; chosen(index)=> { App.action("sort","",index==0?"default":index==1?"ping":"name"); } }
+            Button {y:(parent.height - self.height)/2; text:App.ru?"Проверить все":"Test all"; icon:@image-url("icons/bolt.svg"); enabled:!App.busy; clicked=> { App.action("ping","all",""); } }
+        }
+    }
+    if root.narrow: Button {x:0px; y:62px; primary:true; icon:@image-url("icons/plus.svg"); text:App.ru?"Добавить":"Add"; clicked=> { App.action("import-dialog","",""); } }
+    Field {x:0px; y:root.narrow?118px:72px; width:parent.width; icon:@image-url("icons/search.svg"); text<=>App.query; placeholder:App.ru?"Поиск по имени или адресу…":"Search name or address…"; }
+    ListView {x:0px; y:root.narrow?166px:120px; width:parent.width; height:parent.height - self.y; horizontal-scrollbar-policy:always-off;
+        for row in App.servers: ServerItem { item-data:row; width:parent.width; }
+    }
+    if App.servers.length==0: EmptyState {x:0px; y:120px; width:parent.width; height:parent.height - 120px;
+        icon:@image-url("icons/serveroff.svg"); title:App.ru?"Нет серверов":"No servers";
+        hint:App.ru?"Добавьте подписку или импортируйте ссылки":"Add a subscription or import share links";
+    }
+}
+
+component SubscriptionItem inherits Rectangle {background:transparent;
+    in property<SubRow> item-data;
+    property<bool> narrow:root.width<700px;
+    property<length> controls-top:root.item-data.support?128px:106px;
+    height:root.narrow?(root.item-data.metered?(root.item-data.support?294px:272px):(root.item-data.support?266px:244px)):(root.item-data.metered?162px:150px);
+    Glass {x:0px; y:0px; background:Theme.panel; width:parent.width; height:parent.height - 12px;
+        name-label := Label {height:self.preferred-height; x:16px; y:23px; width:root.narrow?parent.width - 72px:parent.width - 440px; text:root.item-data.name; font-size:15px; font-weight:600; }
+        Button { x:min(parent.width - 48px,name-label.x+name-label.preferred-width+6px); y:16px; width:32px; ghost:true; tip:App.ru?"Переименовать":"Rename"; icon:@image-url("icons/pencil.svg"); clicked=> { App.action("rename-dialog",root.item-data.id,""); } }
+        if !root.narrow: HorizontalLayout {x:parent.width - 396px; y:16px; width:380px; height:36px; spacing:8px;
+            Label {y:(parent.height - self.height)/2; text:App.ru?"Автообновление":"Auto update"; color:Theme.faint; font-size:11px; min-width:self.preferred-width; vertical-alignment:center; }
+            Choice {y:(parent.height - self.height)/2; width:112px; options:[App.ru?"Выключено":"Off","1 "+(App.ru?"ч":"h"),"6 "+(App.ru?"ч":"h"),"12 "+(App.ru?"ч":"h"),"24 "+(App.ru?"ч":"h"),"48 "+(App.ru?"ч":"h")]; selected:root.item-data.hours; chosen(index)=> { App.action("auto-update",root.item-data.id,index==0?"0":index==1?"1":index==2?"6":index==3?"12":index==4?"24":"48"); } }
+            Button {y:(parent.height - self.height)/2; text:App.ru?"Обновить":"Refresh"; icon:@image-url("icons/refresh.svg"); enabled:!App.busy; clicked=> { App.action("update-sub",root.item-data.id,""); } }
+            Button {y:(parent.height - self.height)/2; width:36px; ghost:true; icon:@image-url("icons/trash.svg"); clicked=> { App.action("delete-sub-dialog",root.item-data.id,""); } }
+        }
+        if root.narrow: Label {x:16px; y:root.controls-top; height:36px; width:92px; text:App.ru?"Автообновление":"Auto update"; font-size:11px; color:Theme.faint; }
+        if root.narrow: Choice {x:112px; y:root.controls-top; width:parent.width - 176px; options:[App.ru?"Выключено":"Off","1 "+(App.ru?"ч":"h"),"6 "+(App.ru?"ч":"h"),"12 "+(App.ru?"ч":"h"),"24 "+(App.ru?"ч":"h"),"48 "+(App.ru?"ч":"h")]; selected:root.item-data.hours; chosen(index)=> { App.action("auto-update",root.item-data.id,index==0?"0":index==1?"1":index==2?"6":index==3?"12":index==4?"24":"48"); } }
+        if root.narrow: Button {x:parent.width - 52px; y:root.controls-top; ghost:true; icon:@image-url("icons/trash.svg"); tip:App.ru?"Удалить подписку":"Delete subscription"; clicked=> { App.action("delete-sub-dialog",root.item-data.id,""); } }
+        if root.narrow: Button {x:16px; y:root.controls-top+44px; width:parent.width - 80px; icon:@image-url("icons/refresh.svg"); tip:App.ru?"Обновить":"Refresh"; enabled:!App.busy; clicked=> { App.action("update-sub",root.item-data.id,""); } }
+        Label {height:self.preferred-height; x:16px; y:57px; width:parent.width - 32px; text:root.item-data.url; color:Theme.dim; font-family:"JetBrains Mono"; font-size:13px; }
+        HorizontalLayout { x:16px; y:78px; height:22px; spacing:12px; alignment:start;
+            Label {y:(parent.height - self.height)/2; text:root.item-data.meta; color:Theme.faint; font-size:11px; }
+            if root.item-data.account: Button {y:(parent.height - self.height)/2; height:22px; ghost:true; text:App.ru?"Личный кабинет":"Account"; clicked=> { App.action("account",root.item-data.id,""); } }
+            if root.item-data.support && !root.narrow: Button {y:(parent.height - self.height)/2; height:22px; ghost:true; text:App.ru?"Поддержка":"Support"; clicked=> { App.action("support",root.item-data.id,""); } }
+        }
+        if root.item-data.support && root.narrow: Button {x:6px; y:100px; height:22px; ghost:true; text:App.ru?"Поддержка":"Support"; icon:@image-url("icons/globe.svg"); clicked=> { App.action("support",root.item-data.id,""); } }
+        if root.item-data.metered: Rectangle {x:16px; y:root.narrow?root.controls-top+92px:106px; width:parent.width - 32px; height:4px; border-radius:2px; background:#c4dfe61e;
+            Rectangle {x:0px; y:0px;  width:parent.width*root.item-data.ratio; height:parent.height; border-radius:2px; background:root.item-data.ratio>=0.95?Theme.danger:@linear-gradient(90deg,Theme.accent,Theme.accent2); }
+        }
+        Label {height:root.narrow?40px:self.preferred-height; x:16px; y:root.narrow?root.controls-top+(root.item-data.metered?106px:96px):(root.item-data.metered?120px:107px); width:parent.width - 32px; text:root.item-data.quota; wrap:word-wrap; color:Theme.faint; font-size:11px; vertical-alignment:top; }
+    }
+}
+export component SubscriptionsPage inherits Rectangle {
+    width:100%; height:100%;x:0px; y:0px; 
+    background:transparent;
+    PageHeader {x:0px; y:0px;  title:App.ru?"Подписки":"Subscriptions"; button:App.ru?"Добавить подписку":"Add subscription"; add=> { App.action("sub-dialog","",""); } }
+    ListView {x:0px;  y:56px; width:parent.width; height:parent.height - 56px; horizontal-scrollbar-policy:always-off;
+        for row in App.subscriptions: SubscriptionItem { item-data:row; width:parent.width; }
+    }
+    if App.subscriptions.length==0: EmptyState {x:0px; y:56px; width:parent.width; height:parent.height - 56px;
+        icon:@image-url("icons/rss.svg"); title:App.ru?"Подписок пока нет":"No subscriptions yet";
+        hint:App.ru?"Добавьте ссылку от вашего провайдера":"Add the link provided by your provider";
+    }
+}
+
+component RoutingItem inherits Rectangle {background:transparent;
+    in property<RouteRow> item-data;
+    property<bool> narrow:root.width<700px;
+    height:root.narrow?148px:73px;
+    Glass {x:0px; y:0px; background:Theme.panel; height:root.narrow?140px:65px; width:parent.width; opacity:root.item-data.enabled?1:0.5;
+        Toggle { x:16px; y:root.narrow?28px:14px; checked:root.item-data.enabled; label:App.ru?"Включить правило":"Enable rule"; toggled(value)=> { App.action("rule-toggle",root.item-data.id,value?"true":"false"); } }
+        Rectangle { x:72px; y:root.narrow?29px:15px; width:36px; height:36px; background:#73d5e312; border-color:Theme.border; border-width:1px; border-radius:12px;
+            Icon { x:10px; y:10px; source:root.item-data.rule-type==1?@image-url("icons/globe.svg"):root.item-data.rule-type==2?@image-url("icons/network.svg"):@image-url("icons/app.svg"); colorize:root.item-data.action==2?Theme.danger:root.item-data.action==1?Theme.ok:Theme.accent; }
+        }
+        HorizontalLayout { x:120px; y:13px; width:parent.width - (root.narrow?136px:450px); height:22px; alignment:start; spacing:8px;
+            Label {y:(parent.height - self.height)/2; text:root.item-data.value; font-family:"JetBrains Mono"; font-size:13px; font-weight:600; }
+            if !root.narrow: Badge {y:(parent.height - self.height)/2; text:root.item-data.kind; height:20px; }
+        }
+        if root.narrow: Badge {x:120px; y:40px; text:root.item-data.kind; height:20px; }
+        Label {height:self.preferred-height; x:120px; y:root.narrow?64px:39px; width:parent.width - (root.narrow?136px:440px); text:root.item-data.description; color:Theme.faint; font-size:11px; }
+        Choice {x:root.narrow?120px:parent.width - 328px; y:root.narrow?92px:14px; width:root.narrow?min(252px,parent.width - 136px):130px; options:[App.ru?"Через прокси":"Proxy",App.ru?"Напрямую":"Direct",App.ru?"Блокировать":"Block"]; selected:root.item-data.action; chosen(index)=> { App.action("rule-action",root.item-data.id,index==0?"proxy":index==1?"direct":"block"); } }
+        HorizontalLayout { x:parent.width - 184px; y:root.narrow?28px:14px; width:168px; height:36px; spacing:8px;
+            Button {y:(parent.height - self.height)/2; width:30px; ghost:true; icon:@image-url("icons/up.svg"); enabled:root.item-data.index>0; clicked=> { App.action("rule-move",root.item-data.id,"-1"); } }
+            Button {y:(parent.height - self.height)/2; width:30px; ghost:true; icon:@image-url("icons/down.svg"); clicked=> { App.action("rule-move",root.item-data.id,"1"); } }
+            Button {y:(parent.height - self.height)/2; width:30px; ghost:true; tip:App.ru?"Изменить":"Edit"; icon:@image-url("icons/pencil.svg"); clicked=> { App.action("edit-rule-dialog",root.item-data.id,""); } }
+            Button {y:(parent.height - self.height)/2; width:30px; ghost:true; icon:@image-url("icons/trash.svg"); clicked=> { App.action("delete-rule",root.item-data.id,""); } }
+        }
+    }
+}
+export component RoutingPage inherits Rectangle {
+    property<bool> narrow:root.width<700px;
+    width:100%; height:100%;x:0px; y:0px; 
+    background:transparent;
+    PageHeader {x:0px; y:0px; title:App.ru?"Маршрутизация":"Routing"; subtitle:App.route-counts[0]+" "+(App.ru?"правил":"rules"); button:App.ru?"Добавить правило":"Add rule"; add=> { App.action("rule-dialog","",""); } }
+    default-card := Glass {x:0px; y:root.narrow?64px:68px; width:parent.width; height:root.narrow?152px:80px;
+        Label {width:parent.width - self.x; height:self.preferred-height;  x:20px; y:20px; text:App.ru?"Остальной трафик":"Other traffic"; font-weight:600; }
+        Label {width:root.narrow?parent.width - 40px:parent.width - 288px; height:root.narrow?42px:24px; x:20px; y:root.narrow?40px:40px; wrap:word-wrap; text:App.ru?"Маршрут по умолчанию для соединений без отдельного правила":"Default route for connections without a matching rule"; color:Theme.dim; }
+        Rectangle { x:root.narrow?20px:parent.width - 252px; y:root.narrow?88px:17px; width:root.narrow?parent.width - 40px:232px; height:46px; border-radius:12px; border-color:Theme.control-border; border-width:1px; background:#c4dfe609;
+            HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
+                for text[index] in [App.ru?"Через прокси":"Proxy",App.ru?"Напрямую":"Direct"]: Rectangle {y:(parent.height - self.height)/2; border-radius:9px; border-width:1px; border-color:App.route-default==index?Theme.selected-border:transparent; background:App.route-default==index?Theme.selected:transparent;
+                    Label {width:parent.width; height:parent.height; x:0px; y:0px; text:text; horizontal-alignment:center; vertical-alignment:center; color:Theme.dim; }
+                    TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.action("route-default","",index==0?"proxy":"direct"); } }
+                }
+            }
+        }
+    }
+    warning := Rectangle {x:0px; y:default-card.y+default-card.height+20px; width:parent.width; height:root.narrow?110px:62px; background:#f2b54412; border-color:#f2b54440; border-width:1px; border-radius:12px;
+        Icon { x:18px; y:(parent.height - 16px)/2; source:@image-url("icons/shield.svg"); colorize:Theme.warn; }
+        Label { x:46px; y:0px; width:parent.width - 216px; height:parent.height; vertical-alignment:center; wrap:word-wrap; color:Theme.dim; text:App.ru?"Фильтрация приложений работает в режиме TUN. Правила для доменов и IP действуют во всех режимах.":"Application filtering works in TUN mode. Domain and IP rules apply in all modes."; }
+        Button { x:parent.width - 155px; y:(parent.height - 36px)/2; width:139px; text:App.ru?"Выбрать режим":"Choose mode"; clicked=> { App.page=0; } }
+    }
+    if App.route-dirty: Glass {x:0px; y:warning.y+warning.height+16px; width:parent.width; height:48px; border-radius:12px;
+        Label {x:16px; y:0px; height:parent.height; width:parent.width - 200px; text:App.ru?"Переподключитесь, чтобы применить изменения":"Reconnect to apply the changes"; color:Theme.dim; }
+        Button {x:parent.width - self.width - 12px; y:6px; text:App.ru?"Переподключить":"Reconnect"; enabled:!App.busy; clicked=> { App.action("reconnect","",""); } }
+    }
+    filters := Rectangle {x:0px; y:warning.y+warning.height+20px+(App.route-dirty?60px:0px); height:root.narrow?94px:46px; width:parent.width; background:transparent;
+        Rectangle {x:0px; y:0px; height:46px; width:root.narrow?root.width:root.width*0.46; border-radius:12px; border-width:1px; border-color:Theme.control-border; background:#c4dfe608;
+            HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
+                for text[index] in [App.ru?"Все":"All",App.ru?"Приложения":"Apps",App.ru?"Домены":"Domains","IP"]: Rectangle {y:(parent.height - self.height)/2; background:App.route-filter==index?Theme.selected:transparent; border-color:App.route-filter==index?Theme.selected-border:transparent; border-width:1px; border-radius:9px;
+                    Label {width:parent.width; height:parent.height; x:0px; y:0px; text:text+" ("+App.route-counts[index]+")"; font-size:12px; horizontal-alignment:center; vertical-alignment:center; }
+                    TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.route-filter=index; } }
+                }
+            }
+        }
+        Field {x:root.narrow?0px:root.width*0.46+12px; y:root.narrow?58px:5px; width:root.narrow?root.width:root.width*0.54 - 12px; icon:@image-url("icons/search.svg"); text<=>App.query; placeholder:App.ru?"Поиск по значению или описанию…":"Search value or description…"; }
+    }
+    ListView {x:0px; y:filters.y+filters.height+20px; width:parent.width; height:parent.height - self.y; horizontal-scrollbar-policy:always-off;
+        for row in App.routes: RoutingItem { item-data:row; width:parent.width; }
+    }
+}
+
+component SettingsItem inherits Rectangle {
+    in property<SettingRow> item-data;
+    in property<bool> mobile;
+    property<length> row-height:root.item-data.kind==0?56px:root.mobile?(root.item-data.description!=""?142px:76px):(root.item-data.description!=""?90px:48px);
+    property<length> control-y:root.mobile?root.row-height - 44px:(root.row-height - 36px)/2;
+    property<length> control-width:root.mobile?root.width - 40px:root.item-data.key=="language"?144px:root.item-data.key=="tunMtu"?96px:root.item-data.key=="tunStack"?128px:root.item-data.key=="ipStrategy"?224px:240px;
+    height:root.row-height+(root.item-data.last?32px:0px);
+    Rectangle {
+        x:0px; y:0px; width:parent.width; height:root.row-height+(root.item-data.last?16px:0px);
+        background:Theme.panel; border-width:1px; border-color:Theme.border;
+        border-radius:root.item-data.kind==0||root.item-data.last?18px:0px;
+        if root.item-data.kind==0: Rectangle { x:1px; y:30px; width:parent.width - 2px; height:parent.height - 30px; background:Theme.panel; }
+        if root.item-data.last: Rectangle { x:1px; y:0px; width:parent.width - 2px; height:24px; background:Theme.panel; }
+        if root.item-data.kind!=0 && !root.item-data.last: Rectangle { x:1px; y:0px; width:parent.width - 2px; height:parent.height; background:Theme.panel; }
+    }
+    if root.item-data.kind==0: Rectangle {
+        x:20px; y:0px; width:parent.width - 40px; height:56px; background:transparent;
+        Label { x:0px; y:16px; width:parent.width; height:22px; text:root.item-data.label; color:Theme.accent; font-family:"Manrope"; font-weight:800; font-size:14px; letter-spacing:0.5px; }
+        Rectangle { x:0px; y:48px; width:parent.width; height:1px; background:Theme.border; }
+    }
+    if root.item-data.kind!=0: Rectangle {
+        x:20px; y:0px; width:parent.width - 40px; height:root.row-height; background:transparent;
+        Label { x:0px; y:root.mobile?8px:0px; width:root.mobile?parent.width:parent.width - root.control-width - 16px; height:root.mobile?22px:root.item-data.description!=""?32px:parent.height; text:root.item-data.label; color:Theme.dim; vertical-alignment:center; wrap:word-wrap; }
+        if root.item-data.description!="": Label { x:0px; y:root.mobile?36px:34px; width:root.mobile?parent.width:parent.width - root.control-width - 16px; height:root.mobile?60px:46px; text:root.item-data.description; color:Theme.faint; font-size:11px; wrap:word-wrap; }
+        if !root.item-data.last: Rectangle { x:0px; y:parent.height - 1px; width:parent.width; height:1px; background:#c4dfe61f; }
+        if root.item-data.kind==1: Toggle { x:parent.width - self.width; y:root.control-y; checked:root.item-data.checked; label:root.item-data.label; enabled:!App.busy; toggled(value)=> { App.action("setting",root.item-data.key,value?"true":"false"); } }
+        if root.item-data.kind==2: Choice { x:parent.width - self.width; y:root.control-y; width:root.control-width; options:root.item-data.options; selected:root.item-data.selected; chosen(index)=> { App.action("setting-choice",root.item-data.key,index); } }
+        if root.item-data.kind==3: Field { x:parent.width - self.width; y:root.control-y; width:root.control-width; text:root.item-data.value; committed(value)=> { App.action("setting",root.item-data.key,value); } }
+        if root.item-data.kind==4: Button { x:parent.width - self.width; y:root.control-y; width:root.control-width; text:root.item-data.value; clicked=> { App.action("settings-action",root.item-data.key,""); } }
+        if root.item-data.kind==6: Label { x:parent.width - root.control-width; y:root.control-y; width:root.control-width; height:36px; text:root.item-data.value; horizontal-alignment:right; font-family:"JetBrains Mono"; }
+        if root.item-data.kind==5: HorizontalLayout { x:parent.width - 154px; y:root.control-y; width:154px; height:36px; spacing:10px;
+            for tint[index] in [#73d5e3,#5ad0e0,#5c9fd1,#d0e8ec]: Rectangle {
+                width:31px; height:31px; y:(parent.height - self.height)/2; border-radius:16px;
+                background:root.item-data.selected==index?Theme.selected:transparent;
+                border-color:root.item-data.selected==index?Theme.selected-border:transparent; border-width:2px;
+                Rectangle { x:4.5px; y:4.5px; width:22px; height:22px; border-radius:11px; background:tint; }
+                TouchArea { x:0px; y:0px; mouse-cursor:pointer; clicked=> { App.action("setting-choice",root.item-data.key,index); } }
+            }
+        }
+    }
+}
+export component SettingsPage inherits Rectangle {
+    in property<bool> mobile;
+    width:100%; height:100%; x:0px; y:0px; background:transparent;
+    Heading { x:0px; y:0px; width:parent.width; height:self.preferred-height; text:App.ru?"Настройки":"Settings"; font-size:root.mobile?19.2px:22px; }
+    ListView { x:0px; y:44px; width:parent.width; height:parent.height - 44px; horizontal-scrollbar-policy:always-off;
+        for row in App.settings: SettingsItem { item-data:row; mobile:root.mobile; width:parent.width; }
+    }
+}
+
+export component LogsPage inherits Rectangle {
+    width:100%; height:100%;x:0px; y:0px; 
+    background:transparent;
+    property<bool> narrow:root.width<900px;
+    HorizontalLayout {x:0px; y:0px; width:root.narrow?root.width:root.width - 400px; height:36px; spacing:8px;
+        for level[index] in [App.ru?"Все":"All","Debug","Info","Warn","Error"]: Rectangle {
+            width:index==0?50px:54px; height:28px; y:4px; border-radius:14px;
+            background:App.log-level==(index==0?"":level.to-lowercase())?Theme.selected:transparent;
+            border-width:1px; border-color:App.log-level==(index==0?"":level.to-lowercase())?Theme.border:transparent;
+            Label {x:0px; y:0px; width:parent.width; height:parent.height; text:level; font-size:12px; font-weight:500; horizontal-alignment:center; color:Theme.dim; }
+            TouchArea {mouse-cursor:pointer; clicked=> { App.action("log-level","",level); } }
+        }
+        Field {y:0px; icon:@image-url("icons/search.svg"); text<=>App.log-query; placeholder:App.ru?"Поиск по журналу…":"Search logs…"; }
+    }
+    HorizontalLayout {x:root.narrow?0px:root.width - 388px; y:root.narrow?44px:0px; height:36px; spacing:8px;
+        Button {y:(parent.height - self.height)/2; icon:@image-url("icons/pause.svg"); text:App.log-paused?(App.ru?"Продолжить":"Resume"):(App.ru?"Пауза":"Pause"); clicked=> { App.log-paused=!App.log-paused; App.action("logs","",""); } }
+        Button {y:(parent.height - self.height)/2; icon:@image-url("icons/copy.svg"); text:App.ru?"Копировать":"Copy"; clicked=> { App.action("copy-logs","",""); } }
+        Button {y:(parent.height - self.height)/2; icon:@image-url("icons/trash.svg"); text:App.ru?"Очистить":"Clear"; clicked=> { App.action("clear-logs","",""); } }
+    }
+    Glass {x:0px; y:root.narrow?96px:52px; width:parent.width; height:parent.height - self.y;
+        if App.logs.length==0: EmptyState {x:0px; y:0px; width:parent.width; height:parent.height; icon:@image-url("icons/scroll.svg"); title:App.ru?"Журнал пуст":"No logs yet"; hint:App.ru?"Записи появятся после запуска ядра":"Entries appear when the core starts"; }
+        ListView {x:16px; y:12px; width:parent.width - 32px; height:parent.height - 24px; horizontal-scrollbar-policy:always-off;
+            for line in App.logs: Rectangle {height:22px; background:transparent;
+                HorizontalLayout {x:0px; y:0px; width:parent.width; height:22px; spacing:10px;
+                    Label {text:line.clock; color:Theme.faint; font-family:"JetBrains Mono"; font-size:12.5px; }
+                    Label {text:line.tag; color:line.tint; font-family:"JetBrains Mono"; font-size:12.5px; font-weight:600; }
+                    Label {text:line.message; color:Theme.dim; font-family:"JetBrains Mono"; font-size:12.5px; horizontal-stretch:1; }
+                }
+            }
+        }
+    }
+}

@@ -164,7 +164,6 @@ pub fn list_running_processes() -> Vec<RunningProcess> {
     Vec::new()
 }
 
-#[tauri::command]
 pub async fn get_running_processes() -> AppResult<Vec<RunningProcess>> {
     tokio::task::spawn_blocking(list_running_processes)
         .await

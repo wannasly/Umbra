@@ -1,12 +1,11 @@
 //! Connection lifecycle commands: connect, disconnect, mode switch, pings,
 //! url test and the log ring buffer accessors.
 
-use tauri::{AppHandle, Emitter, Manager};
+use crate::runtime::AppHandle;
 
 use crate::error::{AppError, AppResult};
-use crate::events::{LogLine, PingResult, EV_NEEDS_ELEVATION, EV_PING_RESULT};
+use crate::events::{PingResult, EV_NEEDS_ELEVATION, EV_PING_RESULT};
 use crate::models::{ConnStatus, ConnectionState, Mode, ServerEntry};
-use crate::net::ping::{self, PingTarget};
 use crate::proxy::{elevation, system_proxy};
 use crate::singbox::{clash_api, config, process, version};
 use crate::state::{update_conn, AppState};
@@ -42,7 +41,7 @@ fn random_secret() -> String {
 }
 
 pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<ConnectionState> {
-    let state = app.state::<AppState>();
+    let state = app.state();
     version::ensure_compatible_core(&version::core_path(&state.data_dir))?;
     let servers: Vec<ServerEntry> =
         { state.profiles.read().await.all_servers().cloned().collect() };
@@ -82,7 +81,7 @@ pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<
         let generated = config::generate(&settings, &refs, &server_id, clash_port, &secret)?;
         process::start(app, &generated, settings.mode, settings.mixed_port).await?;
         if settings.mode == Mode::SystemProxy {
-            if let Err(e) = system_proxy::enable_proxy(&state, settings.mixed_port).await {
+            if let Err(e) = system_proxy::enable_proxy(state, settings.mixed_port).await {
                 process::stop(app).await;
                 return Err(e);
             }
@@ -135,7 +134,7 @@ pub(crate) fn notify_needs_elevation(app: &AppHandle, err: &AppError) {
 /// connection back up) and `connectOnStartup` both funnel through this single
 /// call site, so the two triggers can never fire two connects.
 pub(crate) async fn startup_connect(app: &AppHandle) {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let Some(server_id) = ({ state.settings.read().await.selected_server_id.clone() }) else {
         state.logs.push_now(
             "warn",
@@ -162,31 +161,12 @@ pub(crate) async fn do_disconnect(app: &AppHandle) -> AppResult<ConnectionState>
     })
     .await;
     process::stop(app).await;
-    let mode = { app.state::<AppState>().settings.read().await.mode };
+    let mode = { app.state().settings.read().await.mode };
     Ok(update_conn(app, |c| *c = ConnectionState::disconnected(mode)).await)
 }
 
-#[tauri::command]
-pub async fn connect(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    server_id: String,
-) -> AppResult<ConnectionState> {
-    let _ops = state.conn_ops.lock().await;
-    do_connect(&app, server_id).await
-}
-
-#[tauri::command]
-pub async fn disconnect(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> AppResult<ConnectionState> {
-    let _ops = state.conn_ops.lock().await;
-    do_disconnect(&app).await
-}
-
 pub(crate) async fn do_set_mode(app: &AppHandle, mode: Mode) -> AppResult<ConnectionState> {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let current = { state.settings.read().await.mode };
     if current == mode {
         return Ok(state.conn.read().await.clone());
@@ -212,40 +192,12 @@ pub(crate) async fn do_set_mode(app: &AppHandle, mode: Mode) -> AppResult<Connec
     Ok(update_conn(app, |c| c.mode = mode).await)
 }
 
-#[tauri::command]
-pub async fn set_mode(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    mode: Mode,
-) -> AppResult<ConnectionState> {
+pub async fn set_mode(app: AppHandle, state: &AppState, mode: Mode) -> AppResult<ConnectionState> {
     let _ops = state.conn_ops.lock().await;
     do_set_mode(&app, mode).await
 }
 
-#[tauri::command]
-pub async fn ping_servers(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    ids: Vec<String>,
-) -> AppResult<()> {
-    let targets: Vec<PingTarget> = {
-        let profiles = state.profiles.read().await;
-        ids.iter()
-            .filter_map(|id| {
-                profiles.find_server(id).map(|s| PingTarget {
-                    id: s.id.clone(),
-                    host: s.server.clone(),
-                    port: s.port,
-                })
-            })
-            .collect()
-    };
-    tauri::async_runtime::spawn(ping::ping_many(app, targets));
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn url_test_active(app: AppHandle, state: tauri::State<'_, AppState>) -> AppResult<u32> {
+pub async fn url_test_active(app: AppHandle, state: &AppState) -> AppResult<u32> {
     let (status, server_id) = {
         let conn = state.conn.read().await;
         (conn.status, conn.server_id.clone())
@@ -293,20 +245,6 @@ pub async fn url_test_active(app: AppHandle, state: tauri::State<'_, AppState>) 
         },
     );
     Ok(ms)
-}
-
-#[tauri::command]
-pub async fn get_recent_logs(
-    state: tauri::State<'_, AppState>,
-    limit: usize,
-) -> AppResult<Vec<LogLine>> {
-    Ok(state.logs.tail(limit))
-}
-
-#[tauri::command]
-pub async fn clear_logs(state: tauri::State<'_, AppState>) -> AppResult<()> {
-    state.logs.clear();
-    Ok(())
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
 //! sing-box process lifecycle: config write, `check`, spawn, readiness,
-//! log pipeline (ring buffer + 250ms batch flusher) and crash supervision
+//! bounded log ring buffer and crash supervision
 //! with 1s/3s/9s backoff (max 3 attempts, counter resets after 60s uptime).
 
 use std::collections::{HashMap, VecDeque};
@@ -9,26 +9,25 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tauri::{AppHandle, Emitter, Manager};
+use crate::runtime::AppHandle;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::Notify;
 use tokio::time::Instant;
 
 use crate::error::{AppError, AppResult};
-use crate::events::{CrashInfo, LogLine, EV_CORE_CRASHED, EV_CORE_LOG};
+use crate::events::{CrashInfo, LogLine, EV_CORE_CRASHED};
 use crate::models::{ConnStatus, Mode};
 use crate::proxy::system_proxy;
 use crate::singbox::clash_api;
 use crate::singbox::config::GeneratedConfig;
 use crate::singbox::job;
 use crate::singbox::version::core_path;
-use crate::state::{update_conn, AppState};
+use crate::state::update_conn;
 
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 const LOG_CAP: usize = 2000;
-const FLUSH_INTERVAL: Duration = Duration::from_millis(250);
 const KILL_GRACE: Duration = Duration::from_secs(3);
 const STOP_JOIN_TIMEOUT: Duration = Duration::from_secs(12);
 const MAX_RESTART_ATTEMPTS: u32 = 3;
@@ -79,7 +78,7 @@ pub struct LogBuffer {
 #[derive(Default)]
 struct LogInner {
     ring: VecDeque<LogLine>,
-    pending: Vec<LogLine>,
+    revision: u64,
 }
 
 impl LogBuffer {
@@ -91,16 +90,19 @@ impl LogBuffer {
         self.inner.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    pub fn push(&self, line: LogLine) {
+    pub fn push(&self, mut line: LogLine) {
+        if line.message.len() > 8192 {
+            let mut end = 8192;
+            while !line.message.is_char_boundary(end) {
+                end -= 1;
+            }
+            line.message.truncate(end);
+        }
         let mut g = self.lock();
-        g.ring.push_back(line.clone());
+        g.revision = g.revision.wrapping_add(1);
+        g.ring.push_back(line);
         while g.ring.len() > LOG_CAP {
             g.ring.pop_front();
-        }
-        g.pending.push(line);
-        let overflow = g.pending.len().saturating_sub(LOG_CAP);
-        if overflow > 0 {
-            g.pending.drain(..overflow);
         }
     }
 
@@ -121,30 +123,12 @@ impl LogBuffer {
     pub fn clear(&self) {
         let mut g = self.lock();
         g.ring.clear();
-        g.pending.clear();
+        g.revision = g.revision.wrapping_add(1);
     }
 
-    pub fn drain_pending(&self) -> Vec<LogLine> {
-        std::mem::take(&mut self.lock().pending)
+    pub fn revision(&self) -> u64 {
+        self.lock().revision
     }
-}
-
-/// Emits accumulated new log lines as one `core://log` batch every 250ms.
-/// Lives for the whole app session.
-pub fn spawn_log_flusher(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
-        let mut ticker = tokio::time::interval(FLUSH_INTERVAL);
-        ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-        loop {
-            ticker.tick().await;
-            let batch = app.state::<AppState>().logs.drain_pending();
-            if !batch.is_empty() {
-                if let Err(e) = app.emit(EV_CORE_LOG, &batch) {
-                    eprintln!("[umbra] failed to emit {EV_CORE_LOG}: {e}");
-                }
-            }
-        }
-    });
 }
 
 // ---------------------------------------------------------------------------
@@ -247,9 +231,9 @@ pub struct CoreHandle {
     pub tag_by_server_id: HashMap<String, String>,
     pub clash_port: u16,
     pub clash_secret: String,
-    pub supervisor: tauri::async_runtime::JoinHandle<()>,
-    pub traffic: tauri::async_runtime::JoinHandle<()>,
-    pub readiness: tauri::async_runtime::JoinHandle<()>,
+    pub supervisor: tokio::task::JoinHandle<()>,
+    pub traffic: tokio::task::JoinHandle<()>,
+    pub readiness: tokio::task::JoinHandle<()>,
 }
 
 impl CoreHandle {
@@ -294,7 +278,7 @@ pub async fn start(
     mode: Mode,
     mixed_port: u16,
 ) -> AppResult<()> {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let exe = core_path(&state.data_dir);
     if !exe.exists() {
         return Err(AppError::CoreNotInstalled);
@@ -331,13 +315,12 @@ pub async fn start(
     state.logs.push_now("info", "[umbra] sing-box started");
 
     let shared = Arc::new(CoreShared::default());
-    let supervisor =
-        tauri::async_runtime::spawn(supervise(app.clone(), shared.clone(), child, ctx));
+    let supervisor = tokio::spawn(supervise(app.clone(), shared.clone(), child, ctx));
     #[cfg(windows)]
     let traffic = if mode == Mode::Tun {
-        tauri::async_runtime::spawn(clash_api::tun_traffic_loop(app.clone(), shared.clone()))
+        tokio::spawn(clash_api::tun_traffic_loop(app.clone(), shared.clone()))
     } else {
-        tauri::async_runtime::spawn(clash_api::traffic_loop(
+        tokio::spawn(clash_api::traffic_loop(
             app.clone(),
             shared.clone(),
             config.clash_port,
@@ -345,13 +328,13 @@ pub async fn start(
         ))
     };
     #[cfg(not(windows))]
-    let traffic = tauri::async_runtime::spawn(clash_api::traffic_loop(
+    let traffic = tokio::spawn(clash_api::traffic_loop(
         app.clone(),
         shared.clone(),
         config.clash_port,
         config.clash_secret.clone(),
     ));
-    let readiness = tauri::async_runtime::spawn(watch_clash_api(
+    let readiness = tokio::spawn(watch_clash_api(
         app.clone(),
         shared.clone(),
         config.clash_port,
@@ -439,7 +422,7 @@ async fn watch_clash_api(
         let ok = clash_api::probe(port, &secret).await;
         let was = shared.clash_ready.swap(ok, Ordering::SeqCst);
         {
-            let state = app.state::<AppState>();
+            let state = app.state();
             match (was, ok) {
                 (false, true) => {
                     warned = false;
@@ -480,10 +463,10 @@ async fn watch_clash_api(
 /// Best-effort full teardown: restore the system proxy when owned, then kill
 /// the sing-box child this app spawned. Idempotent; never fails.
 pub async fn stop(app: &AppHandle) {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let owned = { state.settings.read().await.proxy_owned };
     if owned {
-        if let Err(e) = system_proxy::disable_proxy(&state).await {
+        if let Err(e) = system_proxy::disable_proxy(state).await {
             eprintln!("[umbra] failed to restore system proxy: {e}");
         }
     }
@@ -559,10 +542,10 @@ fn spawn_child(app: &AppHandle, ctx: &RunCtx) -> AppResult<Child> {
         .map_err(|e| AppError::CoreStartFailed(format!("could not spawn sing-box: {e}")))?;
     assign_to_job(app, &child);
     if let Some(stdout) = child.stdout.take() {
-        tauri::async_runtime::spawn(read_pipe(app.clone(), stdout));
+        tokio::spawn(read_pipe(app.clone(), stdout));
     }
     if let Some(stderr) = child.stderr.take() {
-        tauri::async_runtime::spawn(read_pipe(app.clone(), stderr));
+        tokio::spawn(read_pipe(app.clone(), stderr));
     }
     Ok(child)
 }
@@ -578,7 +561,7 @@ fn assign_to_job(app: &AppHandle, child: &Child) {
             return; // already reaped; nothing to protect
         };
         if let Err(e) = job::assign_current_job(raw) {
-            app.state::<AppState>().logs.push_now(
+            app.state().logs.push_now(
                 "warn",
                 format!("[umbra] {e}; sing-box may outlive the app if it is force-killed"),
             );
@@ -596,7 +579,7 @@ async fn read_pipe<R: AsyncRead + Unpin + Send + 'static>(app: AppHandle, pipe: 
         if line.trim().is_empty() {
             continue;
         }
-        app.state::<AppState>().logs.push(parse_log_line(&line));
+        app.state().logs.push(parse_log_line(&line));
     }
 }
 
@@ -638,10 +621,10 @@ async fn sleep_or_stop(shared: &CoreShared, dur: Duration) -> bool {
 /// wintun adapter, its routes and its strict_route filters with it (see the
 /// note on the tun inbound in `singbox::config`).
 async fn cleanup_proxy_if_owned(app: &AppHandle) {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let owned = { state.settings.read().await.proxy_owned };
     if owned {
-        if let Err(e) = system_proxy::disable_proxy(&state).await {
+        if let Err(e) = system_proxy::disable_proxy(state).await {
             eprintln!("[umbra] failed to restore system proxy: {e}");
         }
     }
@@ -667,7 +650,7 @@ async fn supervise(app: AppHandle, shared: Arc<CoreShared>, mut child: Child, ct
                     attempt = 0;
                 }
                 {
-                    let state = app.state::<AppState>();
+                    let state = app.state();
                     state.logs.push_now(
                         "error",
                         format!(
@@ -702,7 +685,7 @@ async fn supervise(app: AppHandle, shared: Arc<CoreShared>, mut child: Child, ct
                     if sleep_or_stop(&shared, Duration::from_secs(backoff_secs(attempt))).await {
                         return;
                     }
-                    app.state::<AppState>().logs.push_now(
+                    app.state().logs.push_now(
                         "info",
                         format!("[umbra] restarting sing-box (attempt {attempt})"),
                     );
@@ -718,7 +701,7 @@ async fn supervise(app: AppHandle, shared: Arc<CoreShared>, mut child: Child, ct
                                 return;
                             }
                             healthy_since = Instant::now();
-                            app.state::<AppState>()
+                            app.state()
                                 .logs
                                 .push_now("info", "[umbra] sing-box restarted");
                             update_conn(&app, |c| {
@@ -733,7 +716,7 @@ async fn supervise(app: AppHandle, shared: Arc<CoreShared>, mut child: Child, ct
                             if shared.stopping.load(Ordering::SeqCst) {
                                 return;
                             }
-                            app.state::<AppState>()
+                            app.state()
                                 .logs
                                 .push_now("error", format!("[umbra] restart failed: {e}"));
                             code = None;
@@ -761,8 +744,8 @@ async fn respawn(app: &AppHandle, shared: &CoreShared, ctx: &RunCtx) -> AppResul
         return Err(AppError::Internal("stop requested during restart".into()));
     }
     if ctx.mode == Mode::SystemProxy {
-        let state = app.state::<AppState>();
-        if let Err(e) = system_proxy::enable_proxy(&state, ctx.mixed_port).await {
+        let state = app.state();
+        if let Err(e) = system_proxy::enable_proxy(state, ctx.mixed_port).await {
             graceful_kill(&mut child).await;
             return Err(e);
         }
@@ -771,7 +754,7 @@ async fn respawn(app: &AppHandle, shared: &CoreShared, ctx: &RunCtx) -> AppResul
 }
 
 async fn give_up(app: &AppHandle) {
-    let state = app.state::<AppState>();
+    let state = app.state();
     state
         .logs
         .push_now("error", "[umbra] restart attempts exhausted; disconnected");
@@ -873,24 +856,22 @@ mod tests {
     }
 
     #[test]
-    fn drain_pending_empties_but_keeps_ring() {
+    fn long_unicode_log_messages_are_bounded() {
         let buf = LogBuffer::new();
-        buf.push_now("info", "a");
-        buf.push_now("warn", "b");
-        let batch = buf.drain_pending();
-        assert_eq!(batch.len(), 2);
-        assert_eq!(batch[1].level, "warn");
-        assert!(buf.drain_pending().is_empty());
-        assert_eq!(buf.tail(10).len(), 2);
+        buf.push_now("info", "🦀".repeat(10000));
+        let tail = buf.tail(1);
+        assert!(tail[0].message.len() <= 8192);
+        assert!(!tail[0].message.is_empty());
     }
 
     #[test]
-    fn clear_wipes_ring_and_pending() {
+    fn clear_invalidates_cached_logs() {
         let buf = LogBuffer::new();
         buf.push_now("info", "a");
+        let revision = buf.revision();
         buf.clear();
         assert!(buf.tail(10).is_empty());
-        assert!(buf.drain_pending().is_empty());
+        assert_ne!(buf.revision(), revision);
     }
 
     #[test]

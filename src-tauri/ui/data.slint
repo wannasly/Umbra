@@ -1,0 +1,73 @@
+export struct ServerRow { id:string, name:string, host:string, protocol:string, security:string, transport:string, flag:image, ping:string, ping-tone:color, favorite:bool, selected:bool, group:bool, info:bool, links:[string], group-id:string, collapsed:bool, count:string, quota:string, traffic:string, deletable:bool, movable:bool, can-up:bool, can-down:bool }
+export struct SubRow { id:string, name:string, url:string, meta:string, quota:string, ratio:float, metered:bool, hours:int, account:bool, support:bool }
+export struct RouteRow { id:string, value:string, kind:string, description:string, action:int, enabled:bool, index:int, rule-type:int }
+export struct SettingRow { key:string, label:string, description:string, kind:int, value:string, checked:bool, options:[string], selected:int, last:bool }
+export struct ProcessRow { name:string, description:string, path:string }
+export struct LogRow { clock:string, tag:string, tint:color, message:string }
+export global App {
+    in-out property<int> page:0;
+    in-out property<bool> ru:true;
+    in-out property<bool> busy:false;
+    in-out property<int> status:0;
+    in-out property<int> mode:0;
+    in-out property<string> status-text:"Отключено";
+    in-out property<string> server-name:"Сервер не выбран";
+    in-out property<string> server-id;
+    in-out property<string> server-host;
+    in-out property<string> protocol;
+    in-out property<string> security;
+    in-out property<string> transport;
+    in-out property<string> server-total:"0 Б";
+    in-out property<string> server-down:"0 Б";
+    in-out property<string> server-up:"0 Б";
+    in-out property<string> ping:"—";
+    in-out property<color> ping-tone:#c4dfe6a3;
+    in-out property<string> rate-down:"0 Б/с";
+    in-out property<string> rate-up:"0 Б/с";
+    in-out property<string> session:"0 Б";
+    in-out property<string> session-down:"0 Б";
+    in-out property<string> session-up:"0 Б";
+    in-out property<string> uptime:"—";
+    in-out property<image> chart;
+    in-out property<bool> traffic-idle:true;
+    in-out property<string> server-count;
+    in-out property<[ServerRow]> servers;
+    in-out property<[SubRow]> subscriptions;
+    in-out property<[RouteRow]> routes;
+    in-out property<[SettingRow]> settings;
+    in-out property<[ProcessRow]> processes;
+    in-out property<string> process-query;
+    in-out property<string> query;
+    in-out property<int> sort:0;
+    in-out property<int> route-filter:0;
+    in-out property<int> route-default:0;
+    in-out property<[int]> route-counts:[0,0,0,0];
+    in-out property<bool> route-dirty:false;
+    in-out property<string> log-text;
+    in-out property<[LogRow]> logs;
+    in-out property<string> log-level;
+    in-out property<bool> log-paused:false;
+    in-out property<string> log-query;
+    in-out property<string> message;
+    in-out property<bool> message-error:false;
+    in-out property<string> version;
+    in-out property<int> modal:0;
+    in-out property<string> modal-title;
+    in-out property<string> rule-title;
+    in-out property<string> modal-id;
+    in-out property<string> field0;
+    in-out property<string> field1;
+    in-out property<string> field2;
+    in-out property<int> edit-type:0;
+    in-out property<int> edit-matcher:0;
+    in-out property<int> edit-action:0;
+    in-out property<bool> edit-enabled:true;
+    in-out property<string> selected-raw;
+    in-out property<bool> deletable:false;
+    callback action(string,string,string);
+    changed page => { self.action("page","",""); }
+    changed query => { self.action("filter","",""); }
+    changed route-filter => { self.action("filter","",""); }
+    changed log-query => { self.action("logs","",""); }
+    changed process-query => { self.action("process-filter","",""); }
+}

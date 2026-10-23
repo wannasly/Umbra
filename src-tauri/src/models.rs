@@ -1,5 +1,5 @@
 //! Data models persisted to %APPDATA% and exchanged with the frontend.
-//! Shapes must match src/lib/ipc.ts exactly (camelCase on the wire).
+//! JSON field names stay compatible with existing installations.
 
 use serde::{Deserialize, Serialize};
 
@@ -9,28 +9,20 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum Mode {
+    #[default]
     SystemProxy,
     Tun,
 }
 
-impl Default for Mode {
-    fn default() -> Self {
-        Mode::SystemProxy
-    }
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum RouteTarget {
+    #[default]
     Proxy,
     Direct,
-}
-
-impl Default for RouteTarget {
-    fn default() -> Self {
-        RouteTarget::Proxy
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,7 +140,9 @@ impl ConnectionState {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum Transport {
+    #[default]
     Tcp,
     Ws {
         path: String,
@@ -162,12 +156,6 @@ pub enum Transport {
         path: String,
         host: String,
     },
-}
-
-impl Default for Transport {
-    fn default() -> Self {
-        Transport::Tcp
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -363,17 +351,13 @@ pub struct ProxyBackup {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
+#[derive(Default)]
 pub enum IpStrategy {
+    #[default]
     Ipv4Only,
     PreferIpv4,
     PreferIpv6,
     Ipv6Only,
-}
-
-impl Default for IpStrategy {
-    fn default() -> Self {
-        IpStrategy::Ipv4Only
-    }
 }
 
 impl IpStrategy {
@@ -643,13 +627,6 @@ pub struct UpdateCheck {
 pub struct ImportResult {
     pub added: usize,
     pub errors: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ServersList {
-    pub manual: Vec<ServerEntry>,
-    pub subscriptions: Vec<Subscription>,
 }
 
 #[cfg(test)]

@@ -1,0 +1,174 @@
+import "../fonts/Inter-Medium.ttf";
+import "../fonts/Inter-Regular.ttf";
+import "../fonts/Inter-SemiBold.ttf";
+import "../fonts/Manrope-ExtraBold.ttf";
+import "../fonts/JetBrainsMono-Medium.ttf";
+import { ScrollView, AboutSlint } from "std-widgets.slint";
+import { Theme, Label, Heading, Icon, Glass, Button, Field, Choice, Toggle } from "theme.slint";
+import { App } from "data.slint";
+import { Dashboard } from "dashboard.slint";
+import { ServersPage, SubscriptionsPage, RoutingPage, SettingsPage, LogsPage } from "pages.slint";
+export { App, Theme }
+export { ServerRow, SubRow, RouteRow, SettingRow, ProcessRow, LogRow } from "data.slint";
+
+export component MainWindow inherits Window {
+    title:"Umbra";
+    preferred-width:1100px; preferred-height:720px;
+    min-width:480px; min-height:430px;
+    no-frame:true;
+    background:Theme.deep;
+    default-font-family:"Inter";
+    default-font-size:13px;
+    property<bool> dock:root.height<620px || root.width<=640px;
+    property<length> rail-width:root.dock?0px:root.width<1000px?68px:220px;
+    forward-focus: keyboard-root;
+    keyboard-root := FocusScope {
+    x:0px; y:0px; width:root.width; height:root.height;
+    key-pressed(e)=> { if e.text==Key.Escape && App.modal!=0 { App.modal=App.modal==7?5:0; return accept; } return reject; }
+    Image {x:0px; y:0px;  width:parent.width; height:parent.height; source:@image-url("background.svg"); image-fit:fill; }
+    titlebar := Rectangle {x:0px; y:0px; 
+        height:44px; width:parent.width; background:transparent;
+        Image { x:18px; y:13px; width:18px; height:18px; source:@image-url("moon.svg"); }
+        Label {width:parent.width - self.x;  x:44px; y:0px; height:44px; text:"Umbra"; color:Theme.dim; font-size:13px; font-weight:600; letter-spacing:1px; vertical-alignment:center; }
+        TouchArea {x:0px; y:0px;  width:parent.width - 140px; mouse-cursor:default; pointer-event(e)=> { if e.kind==PointerEventKind.down { App.action("window-drag","",""); } } }
+        HorizontalLayout { x:parent.width - 138px; y:4px; width:132px; height:36px; spacing:0px;
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/minus.svg"); clicked=> { App.action("window-minimize","",""); } }
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/square.svg"); clicked=> { App.action("window-maximize","",""); } }
+            Button {y:(parent.height - self.height)/2; width:44px; ghost:true; icon:@image-url("icons/close.svg"); clicked=> { App.action("window-close","",""); } }
+        }
+    }
+    nav := FocusScope {
+        enabled:App.modal==0;
+        x:root.dock?0px:12px; y:root.dock?root.height - 62px:44px;
+        width:root.dock?root.width:root.rail-width - 24px;
+        height:root.dock?62px:root.height - 60px;
+        Rectangle {x:0px; y:0px; width:100%; height:100%; background:root.dock?#00151de6:transparent; }
+        for item[index] in [
+            {label:App.ru?"Главная":"Home",icon:@image-url("icons/house.svg")},
+            {label:App.ru?"Серверы":"Servers",icon:@image-url("icons/list.svg")},
+            {label:App.ru?"Подписки":"Subscriptions",icon:@image-url("icons/rss.svg")},
+            {label:App.ru?"Маршрутизация":"Routing",icon:@image-url("icons/route.svg")},
+            {label:App.ru?"Журнал":"Logs",icon:@image-url("icons/scroll.svg")},
+            {label:App.ru?"Настройки":"Settings",icon:@image-url("icons/settings.svg")}]: FocusScope {
+            x:root.dock ? 8px+index*(parent.width - 44px)/6 : 0px;
+            y:root.dock ? 8px : index*44px;
+            width:root.dock?(parent.width - 44px)/6 - 8px:parent.width; height:root.dock?44px:40px;
+            accessible-role:button; accessible-label:item.label;
+            accessible-action-default=> { App.page=index; }
+            key-pressed(e)=> { if e.text==" " || e.text=="\n" { App.page=index; return accept; } return reject; }
+            Rectangle {x:0px; y:0px; 
+                background:App.page==index?Theme.selected:nav-touch.has-hover?Theme.hover:transparent;
+                border-width:1px; border-color:App.page==index?Theme.selected-border:transparent; border-radius:12px;
+                animate background { duration:Theme.reduce-motion?0ms:150ms; }
+                if App.page==index: Rectangle { x:root.dock?(parent.width - 36px)/2:0px; y:root.dock?parent.height - 3px:9px; width:root.dock?36px:3px; height:root.dock?3px:22px; border-radius:2px; background:@linear-gradient(180deg,Theme.accent,Theme.accent2); }
+                Icon { x:root.dock||root.width<1000px?(parent.width - 16px)/2:14px; y:12px; source:item.icon; colorize:App.page==index?Theme.text:Theme.dim; }
+                if !root.dock && root.width>=1000px: Label {width:parent.width - self.x; y:0px;  x:42px; height:parent.height; text:item.label; vertical-alignment:center; color:App.page==index?Theme.text:Theme.dim; }
+                nav-touch := TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.page=index; } }
+            }
+        }
+        if !root.dock: Glass {x:0px; 
+            y:parent.height - 82px; width:parent.width; height:root.width<1000px?44px:59px;
+            Rectangle { x:12px; y:(parent.height - 8px)/2; width:8px; height:8px; border-radius:4px; background:App.status==2?Theme.ok:App.status==1?Theme.warn:Theme.faint; }
+            if root.width>=1000px: Label {height:self.preferred-height;  x:30px; y:12px; width:parent.width - 42px; text:App.server-name; font-size:12px; }
+            if root.width>=1000px: Label {width:parent.width - self.x; height:self.preferred-height;  x:30px; y:32px; text:App.status-text; font-size:11px; color:Theme.faint; }
+            TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.page=0; } }
+        }
+        if !root.dock: Label {width:parent.width - self.x; height:self.preferred-height;  x:4px; y:parent.height - 13px; text:"v"+App.version; font-size:10px; color:Theme.faint; }
+        if root.dock: Rectangle {x:parent.width - 42px; y:9px; width:34px; height:30px; border-radius:15px; border-color:Theme.border; border-width:1px; background:Theme.glass;
+            Rectangle {x:13px; y:11px; width:8px; height:8px; border-radius:4px; background:App.status==2?Theme.ok:App.status==1?Theme.warn:Theme.faint; }
+            TouchArea {mouse-cursor:pointer; clicked=> { App.page=0; } }
+        }
+    }
+    main := FocusScope {
+        enabled:App.modal==0;
+        x:root.rail-width; y:44px;
+        width:root.width - self.x; height:root.height - 44px - (root.dock?62px:0px);
+        content := Rectangle {
+            width:min(parent.width - (root.width<=640px?40px:52px),App.page==5?704px:App.page==4?1312px:992px);
+            x:(parent.width - self.width - 8px)/2;
+            y:root.dock?14px:24px;
+            height:parent.height - self.y;
+            background:transparent;
+            if App.page==0: ScrollView {x:0px; y:0px; width:100%; height:100%; horizontal-scrollbar-policy:always-off;
+                Dashboard {x:0px; y:0px;  width:parent.width; window-width:root.width; compact:root.height<620px; }
+            }
+            if App.page==1: ServersPage {x:0px; y:0px;  }
+            if App.page==2: SubscriptionsPage {x:0px; y:0px;  }
+            if App.page==3: RoutingPage {x:0px; y:0px;  }
+            if App.page==4: LogsPage {x:0px; y:0px;  }
+            if App.page==5: SettingsPage {mobile:root.width<=640px; x:0px; y:0px;  }
+        }
+    }
+    if App.message!="": Glass {
+        x:root.width - min(480px,root.width - 32px) - 20px; y:root.height - (root.dock?150px:90px);
+        width:min(480px,root.width - 32px); height:64px; background:Theme.raised; border-color:App.message-error?Theme.danger:Theme.accent;
+        Label { x:16px; y:10px; width:parent.width - 62px; height:44px; text:App.message; wrap:word-wrap; color:App.message-error?Theme.danger:Theme.text; }
+        Button { x:parent.width - 46px; y:14px; width:32px; ghost:true; icon:@image-url("icons/close.svg"); clicked=> { App.message=""; } }
+    }
+    if App.modal!=0: Rectangle {x:0px; y:0px; 
+        width:root.width; height:root.height; background:#00080b99;
+        TouchArea {x:0px; y:0px;  clicked=> { App.modal=0; } }
+        modal := Glass {
+            width:min(App.modal==5 || App.modal==7 ? 512px : 448px,parent.width - 32px); height:min(parent.height - 32px,App.modal==5?478px:App.modal==1?360px:App.modal==7?500px:App.modal==8?280px:300px);
+            x:(parent.width - self.width)/2; y:(parent.height - self.height)/2;
+            background:Theme.raised; border-color:Theme.control-border;
+            TouchArea {x:0px; y:0px;  }
+            Heading {height:self.preferred-height; x:24px; y:22px; width:parent.width - 80px; font-size:18px; text:App.modal==5?App.rule-title:App.modal-title; }
+            Button { x:parent.width - 54px; y:16px; width:36px; ghost:true; tip:App.ru?"Закрыть":"Close"; icon:@image-url("icons/close.svg"); clicked=> { App.modal=App.modal==7?5:0; } }
+            if App.modal==1: VerticalLayout { x:24px; y:72px; width:parent.width - 48px; height:210px; spacing:12px;
+                Field {text<=>App.field0; multiline:true; placeholder:App.ru?"Вставьте ссылки VLESS, Hysteria2 или JSON":"Paste VLESS, Hysteria2 links or JSON"; }
+                Button {ghost:true; text:App.ru?"Из буфера обмена":"Paste from clipboard"; icon:@image-url("icons/clipboard.svg"); clicked=> { App.action("paste-import","",""); } }
+            }
+            if App.modal==2 || App.modal==3: VerticalLayout { x:24px; y:72px; width:parent.width - 48px; height:140px; spacing:10px;
+                Label {text:App.ru?"Название":"Name"; }
+                Field {text<=>App.field0; }
+                if App.modal==2: Label {text:App.ru?"Ссылка подписки":"Subscription URL"; }
+                if App.modal==2: Field {text<=>App.field1; placeholder:"https://…"; }
+            }
+            if App.modal==4: Label { x:24px; y:84px; width:parent.width - 48px; height:80px; wrap:word-wrap; text:App.ru?"Удалить выбранную запись? Это действие нельзя отменить.":"Delete the selected entry? This cannot be undone."; }
+            if App.modal==6: Label { x:24px; y:84px; width:parent.width - 48px; height:80px; wrap:word-wrap; text:App.ru?"Для режима TUN нужно перезапустить Umbra с правами администратора.":"TUN mode requires restarting Umbra with administrator rights."; }
+            if App.modal==10: AboutSlint { x:24px; y:82px; width:parent.width - 48px; height:160px; }
+            if App.modal==5: ScrollView {x:24px; y:72px; width:parent.width - 48px; height:parent.height - 148px; horizontal-scrollbar-policy:always-off;
+            VerticalLayout {x:0px; y:0px; width:parent.width; height:310px; spacing:12px;
+                HorizontalLayout {spacing:12px;
+                    Choice {y:(parent.height - self.height)/2; options:[App.ru?"Приложение":"Application",App.ru?"Домен":"Domain","IP / CIDR"]; selected:App.edit-type; chosen(index)=> { App.edit-type=index; App.edit-matcher=0; } }
+                    Choice {y:(parent.height - self.height)/2; options:App.edit-type==0?[App.ru?"Имя процесса":"Process name",App.ru?"Полный путь":"Full path"]:App.edit-type==1?[App.ru?"Суффикс":"Suffix",App.ru?"Точное совпадение":"Exact",App.ru?"Ключевое слово":"Keyword","Regex"]:["CIDR"]; selected:App.edit-matcher; chosen(index)=> { App.edit-matcher=index; } }
+                }
+                Label {text:App.ru?"Значение":"Value"; }
+                Field {text<=>App.field0; placeholder:App.edit-type==0?"chrome.exe":App.edit-type==1?"*.example.com":"1.1.1.1/32"; }
+                if App.edit-type==0: HorizontalLayout {spacing:8px;
+                    Button {ghost:true; text:App.ru?"Запущенные процессы":"Running processes"; clicked=> { App.action("processes","",""); } }
+                    Button {ghost:true; text:App.ru?"Выбрать .exe":"Browse .exe"; clicked=> { App.action("browse-executable","",""); } }
+                }
+                Label {text:App.ru?"Описание (необязательно)":"Description (optional)"; }
+                Field {text<=>App.field1; }
+                HorizontalLayout {spacing:16px;
+                    Choice {y:(parent.height - self.height)/2; options:[App.ru?"Через прокси":"Proxy",App.ru?"Напрямую":"Direct",App.ru?"Блокировать":"Block"]; selected:App.edit-action; chosen(index)=> { App.edit-action=index; } }
+                    Toggle {y:(parent.height - self.height)/2; checked:App.edit-enabled; label:App.ru?"Включить правило":"Enable rule"; toggled(value)=> { App.edit-enabled=value; } }
+                    Label {y:(parent.height - self.height)/2; text:App.ru?"Включено":"Enabled"; vertical-alignment:center; }
+                }
+            }
+            }
+            if App.modal==7: HorizontalLayout {x:24px; y:72px; width:parent.width - 48px; height:36px; spacing:8px;
+                Field {icon:@image-url("icons/search.svg"); text<=>App.process-query; placeholder:App.ru?"Имя процесса, путь или окно…":"Process name, path or window…"; }
+                Button {icon:@image-url("icons/refresh.svg"); tip:App.ru?"Обновить":"Refresh"; enabled:!App.busy; clicked=> { App.action("processes","",""); } }
+            }
+            if App.modal==7: ScrollView { x:24px; y:124px; width:parent.width - 48px; height:parent.height - 148px;
+                VerticalLayout {x:0px; y:0px;  spacing:6px;
+                    for process in App.processes: Button {text:process.name+"  "+process.description; ghost:true; enabled:App.edit-matcher==0 || process.path!=""; clicked=> { App.field0=App.edit-matcher==1?process.path:process.name; App.modal=5; } }
+                }
+            }
+            if App.modal==8: VerticalLayout { x:16px; y:66px; width:parent.width - 32px; height:190px; spacing:4px;
+                Button {text:App.ru?"Проверить задержку":"Test latency"; ghost:true; icon:@image-url("icons/bolt.svg"); clicked=> { App.action("ping",App.modal-id,""); App.modal=0; } }
+                Button {text:App.ru?"Избранное":"Favorite"; ghost:true; icon:@image-url("icons/star.svg"); clicked=> { App.action("favorite-toggle",App.modal-id,""); App.modal=0; } }
+                Button {text:App.ru?"Копировать ссылку":"Copy share link"; ghost:true; icon:@image-url("icons/copy.svg"); clicked=> { App.action("copy-server",App.modal-id,""); App.modal=0; } }
+                if App.deletable: Button {text:App.ru?"Удалить":"Delete"; danger:true; icon:@image-url("icons/trash.svg"); clicked=> { App.action("delete-server-dialog",App.modal-id,""); } }
+            }
+            if App.modal!=7 && App.modal!=8 && App.modal!=10: HorizontalLayout { x:24px; y:parent.height - 60px; width:parent.width - 48px; height:36px; spacing:8px; alignment:end;
+                Button {y:(parent.height - self.height)/2; ghost:true; text:App.ru?"Отмена":"Cancel"; clicked=> { App.modal=0; } }
+                Button {y:(parent.height - self.height)/2; primary:App.modal!=4; danger:App.modal==4; enabled:!App.busy; text:App.modal==4?(App.ru?"Удалить":"Delete"):App.modal==6?(App.ru?"Перезапустить":"Restart"):(App.ru?"Сохранить":"Save"); clicked=> { App.action("modal-submit","",""); } }
+            }
+        }
+    }
+}
+}

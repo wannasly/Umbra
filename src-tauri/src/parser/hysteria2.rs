@@ -78,10 +78,7 @@ pub fn parse_hysteria2(uri: &str) -> AppResult<ProxyNode> {
         return Err(AppError::Parse("hysteria2 URL host is empty".into()));
     }
 
-    let port = match parsed.port() {
-        Some(p) => p,
-        None => 443,
-    };
+    let port = parsed.port().unwrap_or(443);
 
     // Check for multi-port in raw string (e.g. :443-445 or :443,444)
     if let Some(port_pos) = lower_uri.rfind(':') {

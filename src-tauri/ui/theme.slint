@@ -1,0 +1,202 @@
+// Ported from src/styles/theme.css at f93df33, not a replacement design system.
+export global Theme {
+    in-out property<color> accent: #73d5e3;
+    in-out property<color> accent2: #a0e8f0;
+    in-out property<bool> reduce-motion: false;
+    out property<color> deep: #00151d;
+    out property<color> panel: #042e38;
+    out property<color> raised: #073b46;
+    out property<color> glass: #073b46a8;
+    out property<color> border: #c4dfe62e;
+    out property<color> control-border: #c4dfe661;
+    out property<color> focus: #9aeaf3;
+    out property<color> hover: #08404b;
+    out property<color> selected: #0a4652;
+    out property<color> selected-border: #73d5e3b8;
+    out property<color> text: #c4dfe6f2;
+    out property<color> dim: #c4dfe6c2;
+    out property<color> faint: #c4dfe6a3;
+    out property<color> ok: #42e58e;
+    out property<color> warn: #f2b544;
+    out property<color> danger: #ff738f;
+}
+
+export component Label inherits Text {
+    color: Theme.text;
+    font-family: "Inter";
+    font-size: 13px;
+    font-weight: 400;
+    overflow: elide;
+    vertical-alignment:center;
+}
+export component Heading inherits Label {font-family: "Manrope";
+    font-weight: 800;
+    font-size: 22px;
+}
+export component Caption inherits Label {color: Theme.faint;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.1px;
+}
+export component Icon inherits Image {width: 16px;
+    height: 16px;
+    colorize: Theme.dim;
+    image-fit: contain;
+}
+export component Glass inherits Rectangle {background: Theme.glass;
+    border-color: Theme.border;
+    border-width: 1px;
+    border-radius: 18px;
+    drop-shadow-color: #00080b38;
+    drop-shadow-offset-y: 8px;
+    drop-shadow-blur: 24px;
+}
+export component Badge inherits Rectangle {in property<string> text;
+    in property<color> tint: Theme.dim;
+    height: 23px;
+    width: badge-text.preferred-width + 18px;
+    background: #c4dfe611;
+    border-color: Theme.border;
+    border-width: 1px;
+    border-radius: 12px;
+    badge-text := Label {width:parent.width; height:parent.height; x:0px; y:0px;  text: root.text; color: root.tint; font-size: 11px; font-weight: 600; horizontal-alignment: center; vertical-alignment: center; }
+}
+
+export component Button inherits FocusScope {in property<string> text;
+    in property<image> icon;
+    in property<color> icon-tint:Theme.dim;
+    in property<string> tip;
+    in property<bool> primary: false;
+    in property<bool> danger: false;
+    in property<bool> ghost: false;
+    enabled: true;
+    callback clicked;
+    height: 36px;
+    width: root.text=="" ? 36px : button-label.preferred-width + 32px + (root.icon.width>0 ? 24px : 0px);
+    accessible-role: button;
+    accessible-label: root.tip!="" ? root.tip : root.text;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    opacity: root.enabled ? 1 : 0.5;
+    key-pressed(event) => {
+        if (event.text == " " || event.text == "\n") && root.enabled { root.clicked(); return accept; }
+        return reject;
+    }
+    Rectangle {x:0px; y:0px; width:100%; height:100%;
+        background: root.primary ? @linear-gradient(135deg, Theme.accent, Theme.accent2) : root.danger ? (touch.has-hover ? #ff738f33 : #ff738f19) : touch.has-hover ? Theme.hover : root.ghost ? transparent : #073b468c;
+        border-width: root.primary || root.ghost ? 0px : 1px;
+        border-color: root.danger ? #ff738f4d : touch.has-hover ? Theme.selected-border : Theme.control-border;
+        border-radius: 12px;
+        animate background, border-color { duration: Theme.reduce-motion ? 0ms : 150ms; }
+        if root.has-focus: Rectangle { x:-3px; y:-3px; width:parent.width+6px; height:parent.height+6px; border-radius:14px; border-width:2px; border-color:Theme.focus; background:transparent; }
+        content := HorizontalLayout {x:0px; y:0px; width:100%; height:100%; 
+            alignment: center; spacing:8px; padding-left:10px; padding-right:10px;
+            if root.icon.width > 0: Icon {y:(parent.height - self.height)/2; source:root.icon; colorize:root.primary ? Theme.deep : root.danger ? Theme.danger : root.icon-tint; }
+            button-label := Label {y:(parent.height - self.height)/2; text:root.text; min-width:self.preferred-width; color:root.primary ? Theme.deep : root.danger ? Theme.danger : Theme.dim; font-weight:600; vertical-alignment:center; }
+        }
+        touch := TouchArea {x:0px; y:0px;  enabled:root.enabled; mouse-cursor:pointer; clicked=> { root.focus(); root.clicked(); } }
+    }
+}
+
+export component Field inherits Rectangle {in-out property<string> text;
+    in property<string> placeholder;
+    in property<image> icon;
+    in property<bool> multiline: false;
+    in property<bool> secret: false;
+    in property<bool> enabled: true;
+    callback edited(string);
+    callback accepted;
+    callback committed(string);
+    height: root.multiline ? 150px : 36px;
+    background: #073b468c;
+    border-radius:12px;
+    border-color:input.has-focus ? Theme.focus : Theme.control-border;
+    border-width:1px;
+    if root.icon.width>0: Icon {x:12px; y:11px; width:14px; height:14px; source:root.icon; colorize:Theme.faint; }
+    input := TextInput {
+        x:root.icon.width>0?36px:12px; y:8px; width:parent.width - self.x - 12px; height:parent.height - 16px;
+        text <=> root.text;
+        color:Theme.text;
+        font-family:"Inter"; font-size:13px;
+        single-line:!root.multiline;
+        wrap:root.multiline ? word-wrap : no-wrap;
+        input-type:root.secret ? InputType.password : InputType.text;
+        enabled:root.enabled;
+        edited=> { root.edited(root.text); }
+        accepted=> { root.accepted(); root.committed(root.text); }
+        changed has-focus=> { if !self.has-focus { root.committed(root.text); } }
+    }
+    if root.text == "": Label {height:self.preferred-height; x:input.x; y:8px; width:input.width; text:root.placeholder; color:Theme.faint; }
+}
+
+export component Toggle inherits FocusScope {in property<bool> checked;
+    enabled: true;
+    in property<string> label;
+    callback toggled(bool);
+    width:44px; height:36px;
+    accessible-role:checkbox;
+    accessible-label:root.label;
+    accessible-checked:root.checked;
+    accessible-action-default=> { if root.enabled { root.toggled(!root.checked); } }
+    key-pressed(event)=> { if event.text == " " && root.enabled { root.toggled(!root.checked); return accept; } return reject; }
+    Rectangle {
+        x:2px; y:7px; width:40px; height:22px;
+        border-radius:11px;
+        border-width:1px; border-color:root.checked ? transparent : Theme.control-border;
+        background:root.checked ? @linear-gradient(90deg,Theme.accent,Theme.accent2) : Theme.raised;
+        Rectangle {
+            x:root.checked ? 21px : 3px; y:3px; width:16px; height:16px; border-radius:8px; background:white;
+            animate x { duration:Theme.reduce-motion ? 0ms : 150ms; easing:ease-out; }
+        }
+    }
+    TouchArea {x:0px; y:0px;  enabled:root.enabled; mouse-cursor:pointer; clicked=> { root.focus(); root.toggled(!root.checked); } }
+}
+
+export component Choice inherits Rectangle {in property<[string]> options;
+    in property<int> selected;
+    in property<bool> enabled:true;
+    callback chosen(int);
+    preferred-width:150px; height:36px;
+    background:touch.has-hover ? Theme.hover : #073b468c;
+    forward-focus: keyboard;
+    border-width:1px; border-color:Theme.control-border; border-radius:12px;
+    Label {y:0px;  x:12px; width:parent.width - 38px; height:parent.height; vertical-alignment:center; text:root.options[root.selected]; }
+    Icon { x:parent.width - 26px; y:11px; width:14px; height:14px; source:@image-url("icons/chevron.svg"); }
+    keyboard := FocusScope {x:0px; y:0px; width:100%; height:100%; enabled:root.enabled; accessible-role:combobox; accessible-label:root.options[root.selected];
+        accessible-action-default=> { if root.enabled { popup.show(); } }
+        key-pressed(e)=> {
+            if e.text==" " || e.text=="\n" { popup.show(); return accept; }
+            if e.text==Key.DownArrow { root.chosen(min(root.selected+1,root.options.length - 1)); return accept; }
+            if e.text==Key.UpArrow { root.chosen(max(0,root.selected - 1)); return accept; }
+            return reject;
+        }
+    }
+    if keyboard.has-focus: Rectangle {x:-2px; y:-2px; width:parent.width+4px; height:parent.height+4px; border-radius:14px; background:transparent; border-color:Theme.focus; border-width:2px; }
+    touch := TouchArea {x:0px; y:0px;  enabled:root.enabled; mouse-cursor:pointer; clicked=> { keyboard.focus(); popup.show(); } }
+    popup := PopupWindow {
+        x:0px; y:root.height+4px; width:root.width;
+        Rectangle {x:0px; y:0px; 
+            background:Theme.raised; border-width:1px; border-color:Theme.control-border; border-radius:12px;
+            VerticalLayout {x:0px; y:0px; 
+                padding:5px; spacing:2px;
+                for item[index] in root.options: Button {text:item; ghost:true; clicked=> { root.chosen(index); popup.close(); } }
+            }
+        }
+    }
+}
+
+export component EmptyState inherits Rectangle {
+    in property<image> icon;
+    in property<string> title;
+    in property<string> hint;
+    in property<string> button;
+    callback action;
+    background:transparent;
+    Rectangle {x:(parent.width - 96px)/2; y:64px; width:96px; height:96px; border-radius:48px; background:Theme.glass; border-color:Theme.border; border-width:1px;
+        Rectangle {x:16px; y:16px; width:64px; height:64px; border-radius:32px; background:#073b46c7; border-color:Theme.border; border-width:1px;
+            Icon {x:20px; y:20px; width:24px; height:24px; source:root.icon; }
+        }
+    }
+    Heading {x:0px; y:180px; width:parent.width; height:24px; text:root.title; font-size:15px; horizontal-alignment:center; }
+    Label {x:(parent.width - self.width)/2; y:210px; width:min(288px,parent.width); height:44px; text:root.hint; wrap:word-wrap; color:Theme.dim; horizontal-alignment:center; vertical-alignment:top; }
+    if root.button!="": Button {x:(parent.width - self.width)/2; y:270px; primary:true; text:root.button; clicked=> { root.action(); } }
+}

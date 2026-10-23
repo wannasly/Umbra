@@ -1,0 +1,143 @@
+import { Theme, Label, Heading, Caption, Icon, Glass, Badge, Button } from "theme.slint";
+import { App } from "data.slint";
+
+component Stat inherits Rectangle {background:transparent;
+    in property<string> label;
+    in property<string> value;
+    in property<string> foot;
+    in property<image> icon;
+    in property<color> tint:Theme.text;
+    in property<length> size:30px;
+    HorizontalLayout {x:0px;  y:0px; height:16px; alignment:start; spacing:6px;
+        if root.icon.width > 0: Icon {y:(parent.height - self.height)/2; width:13px; height:13px; source:root.icon; colorize:Theme.faint; }
+        Caption {y:(parent.height - self.height)/2; text:root.label; }
+    }
+    Heading {width:parent.width - self.x; x:0px;  y:18px; height:self.preferred-height; text:root.value; color:root.tint; font-size:root.size; }
+    Label {width:parent.width - self.x; height:self.preferred-height; x:0px;  y:root.size+34px; text:root.foot; color:Theme.dim; font-size:13px; }
+}
+
+export component Dashboard inherits Rectangle {background:transparent;
+    in property<length> window-width;
+    in property<bool> compact:false;
+    property<length> box:root.compact ? 152px : clamp(root.window-width*0.205,192px,248px);
+    property<length> inset:clamp(root.window-width*0.018,16px,24px);
+    property<bool> stacked:root.width<560px;
+    height:hero.height+mode.height+stats.height+32px;
+    hero := Glass {x:0px; y:0px; 
+        width:parent.width;
+        height:root.stacked ? root.box+260px : root.box + (root.compact ? 35px : 73px);
+        power-col := Rectangle {
+            x:root.stacked?(parent.width - root.box)/2:root.inset; y:root.stacked?14px:root.compact ? 6px : 20px;
+            width:root.box; height:parent.height - 2*self.y;
+            background:transparent;
+            power := Rectangle {
+                x:root.box*0.11; y:root.box*0.11;
+                width:root.box*0.78; height:self.width;
+                border-radius:self.width/2;
+                background:App.status==2 ? #42e58e14 : touch.has-hover ? Theme.selected : Theme.glass;
+                border-width:1px;
+                border-color:App.status==2 ? #42e58e8c : App.status==1 ? #f2b54480 : #73d5e39e;
+                drop-shadow-offset-y:10px; drop-shadow-blur:30px; drop-shadow-color:#00080b60;
+                animate background,border-color { duration:Theme.reduce-motion ? 0ms : 300ms; }
+                Icon {
+                    x:parent.width*0.31; y:parent.height*0.31;
+                    width:parent.width*0.38; height:self.width;
+                    source:@image-url("icons/power.svg");
+                    colorize:App.status==2 ? Theme.ok : App.status==1 ? Theme.warn : Theme.accent;
+                }
+                FocusScope {x:0px; y:0px; 
+                    accessible-role:button;
+                    accessible-label:App.status==2 ? (App.ru?"Отключить":"Disconnect") : (App.ru?"Подключить":"Connect");
+                    key-pressed(e)=> { if e.text==" " || e.text=="\n" { App.action("toggle","",""); return accept; } return reject; }
+                    touch := TouchArea {x:0px; y:0px;  enabled:!App.busy; mouse-cursor:pointer; clicked=> { App.action("toggle","",""); } }
+                }
+            }
+            Heading {x:0px;  y:root.box + (root.compact? -4px : 3px); width:parent.width; height:32px; text:App.status-text; horizontal-alignment:center; font-size:root.compact?16px:clamp(root.window-width*0.0185,20px,26px); letter-spacing:2px; color:App.status==2 ? Theme.ok : App.status==1 ? Theme.warn : Theme.dim; }
+        }
+        details := Rectangle {
+            x:root.stacked ? root.inset : power-col.x+power-col.width+24px;
+            y:root.stacked ? root.box+72px : (parent.height - 148px)/2;
+            width:parent.width - self.x - root.inset;
+            height:root.stacked?200px:148px; background:transparent;
+            Heading {x:0px; 
+                width:parent.width - (App.server-id!=""?120px:0px);
+                y:-3px; height:self.preferred-height;
+                text:App.server-name;
+                font-size:clamp(root.window-width*0.032,32px,44px);
+                letter-spacing:-0.02 * self.font-size;
+            }
+            if App.server-id!="": HorizontalLayout {
+                x:parent.width - 112px; y:-3px; width:112px; height:48px; spacing:7px;
+                Heading {y:(parent.height - self.height)/2; text:App.ping; color:App.ping-tone; font-size:30px; vertical-alignment:center; }
+                Label {y:(parent.height - self.height)/2; text:App.ping=="—" ? "" : App.ru?"мс":"ms"; color:Theme.faint; vertical-alignment:center; }
+                Button {y:(parent.height - self.height)/2; width:36px; icon:@image-url("icons/refresh.svg"); enabled:!App.busy; clicked=> { App.action("ping",App.server-id,""); } }
+            }
+            if root.stacked: Label {x:0px; y:42px; height:24px; width:parent.width; text:App.server-host; font-family:"JetBrains Mono"; font-size:13px; color:Theme.dim; }
+            HorizontalLayout {x:0px; width:parent.width;
+                y:root.stacked?76px:62px; height:28px; spacing:8px;
+                if !root.stacked: Label {y:(parent.height - self.height)/2; text:App.server-host; font-family:"JetBrains Mono"; font-size:13px; color:Theme.dim; vertical-alignment:center; }
+                if App.protocol!="": Badge {y:(parent.height - self.height)/2;  text:App.protocol; }
+                if App.security!="": Badge {y:(parent.height - self.height)/2;  text:App.security; }
+                if App.transport!="": Badge {y:(parent.height - self.height)/2;  text:App.transport; }
+                Rectangle {y:(parent.height - self.height)/2; horizontal-stretch:1; background:transparent; }
+                Button {y:(parent.height - self.height)/2; ghost:true; text:App.ru?"Сменить":"Change"; icon:@image-url("icons/swap.svg"); clicked=> { App.page=1; } }
+            }
+            if App.server-id!="": Rectangle {x:0px; 
+                y:root.stacked?114px:104px; height:root.stacked?60px:40px; width:parent.width;
+                background:#073b4659; border-color:Theme.border; border-width:1px; border-radius:12px;
+                HorizontalLayout {x:0px; y:0px; height:40px; padding-left:14px; padding-right:14px; spacing:15px; alignment:start;
+                    Caption {y:(parent.height - self.height)/2; text:App.ru?"ВСЕГО ЧЕРЕЗ ЭТОТ СЕРВЕР":"TOTAL THROUGH THIS SERVER"; vertical-alignment:center; }
+                    Heading {y:(parent.height - self.height)/2; text:App.server-total; font-size:20px; vertical-alignment:center; }
+                    if !root.stacked: Label {y:(parent.height - self.height)/2; text:"↓ "+App.server-down+"   ↑ "+App.server-up; color:Theme.dim; vertical-alignment:center; }
+                }
+                if root.stacked: Label {x:14px; y:34px; width:parent.width - 28px; height:20px; text:"↓ "+App.server-down+"   ↑ "+App.server-up; color:Theme.dim; }
+            }
+            if App.server-id=="": Button {x:0px;  y:102px; primary:true; text:App.ru?"Выбрать сервер":"Choose server"; clicked=> { App.page=1; } }
+        }
+    }
+    mode := Glass {x:0px; 
+        y:hero.height+16px; width:parent.width; height:root.width<650px ? 100px : 66px;
+        HorizontalLayout {
+            x:16px; y:11px; width:root.width<650px ? parent.width - 32px : 345px; height:44px;
+            spacing:16px;
+            Caption {y:(parent.height - self.height)/2; text:App.ru?"РЕЖИМ":"MODE"; vertical-alignment:center; }
+            Rectangle {y:(parent.height - self.height)/2;      width:274px; background:#c4dfe60a; border-width:1px; border-color:Theme.control-border; border-radius:12px;
+                HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
+                    for item[index] in [App.ru?"Системный прокси":"System proxy",App.ru?"Режим TUN":"TUN mode"]: Rectangle {y:(parent.height - self.height)/2;              background:App.mode==index ? #c4dfe61f : transparent;
+                        border-radius:9px; border-color:App.mode==index ? Theme.control-border : transparent; border-width:1px;
+                        Label {width:parent.width; height:parent.height; x:0px; y:0px; text:item; horizontal-alignment:center; vertical-alignment:center; font-size:13px; font-weight:600; color:App.mode==index ? Theme.text : Theme.dim; }
+                        TouchArea {x:0px; y:0px;  enabled:!App.busy && App.status==0; mouse-cursor:pointer; clicked=> { App.action("mode","",index==0?"system_proxy":"tun"); } }
+                    }
+                }
+            }
+        }
+        Label {
+            x:root.width<650px ? 16px : 375px; y:root.width<650px ? 60px : 0px; width:parent.width - self.x - 16px; height:root.width<650px ? 32px : parent.height;
+            wrap:word-wrap; vertical-alignment:center; color:Theme.dim; font-size:13px;
+            text:App.status!=0 ? (App.ru?"Чтобы изменить режим, сначала отключитесь":"Disconnect before changing mode") : App.mode==1 ? (App.ru?"Проксирование всей системы — требуются права администратора":"System-wide tunneling — administrator rights required") : (App.ru?"Прокси прописывается в настройках Windows — работает для приложений, которые их читают":"Uses Windows proxy settings — works for applications that respect them");
+        }
+    }
+    stats := Glass {x:0px; background:Theme.panel; 
+        y:mode.y+mode.height+16px; width:parent.width;
+        height:root.compact ? 192px : root.window-width<840px ? 300px : 232px;
+        property<length> stat-size:clamp(root.window-width*0.0235,24px,34px);
+        for item[index] in [
+            {label:App.ru?"ЗАГРУЗКА":"DOWNLOAD",value:App.rate-down,foot:"",icon:@image-url("icons/down.svg"),tint:Theme.accent2},
+            {label:App.ru?"ОТДАЧА":"UPLOAD",value:App.rate-up,foot:"",icon:@image-url("icons/up.svg"),tint:Theme.accent},
+            {label:App.ru?"ЗА СЕССИЮ":"SESSION",value:App.session,foot:"↓ "+App.session-down+"  ↑ "+App.session-up,icon:@image-url("icons/down.svg"),tint:Theme.text},
+            {label:App.ru?"В СЕТИ":"UPTIME",value:App.uptime,foot:"",icon:@image-url("icons/timer.svg"),tint:Theme.text}
+        ]: Stat {
+            x:root.inset+(root.window-width<840px?(index==1||index==3?1:0):index)*(parent.width - 2*root.inset)/(root.window-width<840px?2:4);
+            y:20px+(root.window-width<840px && index>=2?72px:0px);
+            width:(parent.width - 2*root.inset)/(root.window-width<840px?2:4) - 16px; height:86px;
+            label:item.label; value:item.value; foot:item.foot; icon:item.icon; tint:item.tint; size:stats.stat-size;
+        }
+        chart-box := Rectangle {
+            x:root.inset; y:parent.height - 122px; width:parent.width - 2*root.inset; height:104px; background:transparent; clip:true; border-radius:12px;
+            for f in [0.28,0.52,0.76]: Rectangle {x:0px;  y:parent.height*f; height:1px; width:parent.width; background:Theme.border; }
+            if App.traffic-idle: Image {x:0px; y:0px;  width:parent.width; height:parent.height; source:@image-url("tide.svg"); image-fit:fill; }
+            if !App.traffic-idle: Image {x:0px; y:0px;  width:parent.width; height:parent.height; source:App.chart; image-fit:fill; }
+            if App.traffic-idle: Caption {height:self.preferred-height; x:0px;  y:parent.height*0.26; width:parent.width; text:App.status==2 ? (App.ru?"ОЖИДАНИЕ ТРАФИКА":"WAITING FOR TRAFFIC") : (App.ru?"СОЕДИНЕНИЕ НЕ УСТАНОВЛЕНО":"NOT CONNECTED"); horizontal-alignment:center; }
+        }
+    }
+}

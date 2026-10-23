@@ -431,6 +431,7 @@ fn route(settings: &Settings) -> Value {
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)] // Keep scenario setup in the original configuration tests readable.
 mod tests {
     use super::*;
     use crate::models::{AppRouteAction, DomainMatcher, ProcessMatcher, RouteRule, RuleType};
@@ -807,7 +808,7 @@ mod tests {
 
     #[test]
     fn unknown_selected_id_is_not_found() {
-        let servers = vec![entry("a", "S")];
+        let servers = [entry("a", "S")];
         let refs: Vec<&ServerEntry> = servers.iter().collect();
         let err = generate(&Settings::default(), &refs, "nope", 9090, "s").expect_err("must fail");
         assert!(matches!(err, AppError::NotFound(_)));
@@ -874,7 +875,7 @@ mod tests {
                 alpn: vec!["h3".into()],
             }),
         };
-        let servers = vec![hy2_node];
+        let servers = [hy2_node];
         let refs: Vec<&ProxyNode> = servers.iter().collect();
         let cfg = generate(&Settings::default(), &refs, "hy2-1", 9090, "secret").unwrap();
 
@@ -955,7 +956,7 @@ mod tests {
             }),
         };
 
-        let servers = vec![tcp_node, grpc_node];
+        let servers = [tcp_node, grpc_node];
         let refs: Vec<&ProxyNode> = servers.iter().collect();
         let cfg = generate(&Settings::default(), &refs, "tcp-1", 9091, "secret2").unwrap();
 
