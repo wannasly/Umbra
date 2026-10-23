@@ -5,16 +5,15 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::runtime::AppHandle;
 use futures_util::StreamExt;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
-use tauri::{AppHandle, Emitter, Manager};
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::error::{AppError, AppResult};
 use crate::events::{TrafficStats, EV_TRAFFIC};
 use crate::net::traffic::{self, TunCounters};
 use crate::singbox::process::CoreShared;
-use crate::state::AppState;
 use crate::storage;
 
 const PROBE_TIMEOUT: Duration = Duration::from_secs(2);
@@ -142,8 +141,7 @@ pub async fn traffic_loop(app: AppHandle, shared: Arc<CoreShared>, port: u16, se
                             // deltas belong to whichever server the tunnel is
                             // running against right now — including after a
                             // live selector switch.
-                            let active =
-                                { app.state::<AppState>().conn.read().await.server_id.clone() };
+                            let active = { app.state().conn.read().await.server_id.clone() };
                             for batch in totals.record(active.as_deref(), up, down) {
                                 persist_totals(&app, &batch).await;
                             }
@@ -207,7 +205,7 @@ pub async fn tun_traffic_loop(app: AppHandle, shared: Arc<CoreShared>) {
                 down_total,
             },
         );
-        let active = { app.state::<AppState>().conn.read().await.server_id.clone() };
+        let active = { app.state().conn.read().await.server_id.clone() };
         for batch in totals.record(active.as_deref(), up_delta, down_delta) {
             persist_totals(&app, &batch).await;
         }
@@ -294,7 +292,7 @@ impl TotalsAccumulator {
 }
 
 async fn persist_totals(app: &AppHandle, batch: &TotalsBatch) {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let mut profiles = state.profiles.write().await;
     let Some(server) = profiles.find_server_mut(&batch.server_id) else {
         return; // deleted mid-session; the bytes have nowhere to go

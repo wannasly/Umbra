@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use tauri::{AppHandle, Emitter, Manager};
+use crate::runtime::AppHandle;
 use tokio::sync::{Mutex, RwLock};
 
 use crate::events::EV_CONN_STATE;
@@ -8,7 +8,7 @@ use crate::models::{ConnectionState, ProfileStore, Settings};
 use crate::singbox::download::ReleaseInfo;
 use crate::singbox::process::{CoreHandle, LogBuffer};
 
-/// Global app state managed by Tauri (`app.manage(AppState::new(..))`).
+/// Shared application state owned by the native Rust runtime.
 /// Modules add their own handles here as they are implemented.
 pub struct AppState {
     pub settings: RwLock<Settings>,
@@ -51,7 +51,7 @@ pub async fn update_conn(
     app: &AppHandle,
     mutate: impl FnOnce(&mut ConnectionState),
 ) -> ConnectionState {
-    let state = app.state::<AppState>();
+    let state = app.state();
     let snapshot = {
         let mut conn = state.conn.write().await;
         mutate(&mut conn);
@@ -60,6 +60,5 @@ pub async fn update_conn(
     if let Err(e) = app.emit(EV_CONN_STATE, &snapshot) {
         eprintln!("[umbra] failed to emit {EV_CONN_STATE}: {e}");
     }
-    crate::tray::sync(app, &snapshot).await;
     snapshot
 }

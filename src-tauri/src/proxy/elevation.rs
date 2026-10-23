@@ -44,10 +44,8 @@ pub fn is_elevated() -> bool {
 
 /// Relaunch the current executable elevated (UAC "runas" verb).
 /// The caller is expected to exit the current process afterwards, and to do so
-/// promptly: the new instance goes through `tauri-plugin-single-instance`, so
-/// if it starts before this one is gone it hands its args over and exits. The
-/// UAC prompt makes that race practically unreachable, but it is the reason
-/// `ShellExecuteW` is followed immediately by `app.exit(0)`.
+/// promptly. The elevated instance waits for the old native instance to finish
+/// restoring its proxy and release the singleton before it resumes TUN.
 pub fn relaunch_elevated(extra_args: &[&str]) -> AppResult<()> {
     let exe = std::env::current_exe()?;
     let verb = HSTRING::from("runas");

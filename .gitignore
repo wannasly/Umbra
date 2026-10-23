@@ -1,4 +1,5 @@
 # Logs
+/target/
 logs
 *.log
 npm-debug.log*
@@ -35,3 +36,4 @@ generated.json
 
 # bundled sing-box core (fetched at build time, 44MB)
 src-tauri/resources/sing-box.exe
+/artifacts/

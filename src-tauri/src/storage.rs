@@ -94,6 +94,7 @@ pub fn save_profiles(data_dir: &Path, profiles: &ProfileStore) -> AppResult<()> 
 }
 
 #[cfg(test)]
+#[allow(clippy::field_reassign_with_default)]
 mod tests {
     use super::*;
 

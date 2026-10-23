@@ -20,20 +20,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-
-      - run: npm ci
 
       - name: Download verified sing-box core
         shell: pwsh
@@ -50,6 +41,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
           Copy-Item -LiteralPath "$expanded/sing-box-$env:SING_BOX_VERSION-windows-amd64/sing-box.exe" -Destination "src-tauri/resources/sing-box.exe"
 
-      - run: npm run build
-      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
-      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: cargo fmt --all -- --check
+      - run: cargo test --workspace --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo check --features smoke-test --locked

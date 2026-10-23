@@ -3,12 +3,12 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use crate::runtime::AppHandle;
 use chrono::{DateTime, Utc};
-use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::{AppError, AppResult};
 use crate::events::{SubUpdated, EV_SUB_UPDATED};
-use crate::models::{ConnStatus, ConnectionState, ImportResult, ServersList, Subscription};
+use crate::models::{ConnStatus, ConnectionState, ImportResult, Subscription};
 use crate::parser;
 use crate::singbox::clash_api;
 use crate::state::{update_conn, AppState};
@@ -94,9 +94,7 @@ async fn reconcile_profiles(app: &AppHandle, state: &AppState) {
 /// Subscription request identity taken from settings. Panels that enforce a
 /// device limit (Remnawave: `X-Hwid-Not-Supported`) serve a placeholder server
 /// until these headers arrive.
-async fn fetch_params(
-    state: &tauri::State<'_, AppState>,
-) -> (String, Option<subscription::DeviceIdentity>) {
+async fn fetch_params(state: &&AppState) -> (String, Option<subscription::DeviceIdentity>) {
     let settings = state.settings.read().await;
     // An empty hwid would send `x-hwid:` with no value, which panels read as a
     // malformed device rather than as an absent one; omit the headers instead.
@@ -112,11 +110,7 @@ async fn fetch_params(
     (settings.sub_user_agent.clone(), identity)
 }
 
-#[tauri::command]
-pub async fn import_share_links(
-    state: tauri::State<'_, AppState>,
-    text: String,
-) -> AppResult<ImportResult> {
+pub async fn import_share_links(state: &AppState, text: String) -> AppResult<ImportResult> {
     let trimmed = text.trim_start_matches('\u{feff}').trim();
     let (parsed, errors) = if trimmed.starts_with('[') {
         parser::v2ray_json::parse_v2ray_json(trimmed)
@@ -139,21 +133,7 @@ pub async fn import_share_links(
     Ok(ImportResult { added, errors })
 }
 
-#[tauri::command]
-pub async fn list_servers(state: tauri::State<'_, AppState>) -> AppResult<ServersList> {
-    let profiles = state.profiles.read().await;
-    Ok(ServersList {
-        manual: profiles.manual.clone(),
-        subscriptions: profiles.subscriptions.clone(),
-    })
-}
-
-#[tauri::command]
-pub async fn remove_server(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    id: String,
-) -> AppResult<()> {
+pub async fn remove_server(app: AppHandle, state: &AppState, id: String) -> AppResult<()> {
     {
         let mut profiles = state.profiles.write().await;
         let before = profiles.manual.len();
@@ -163,14 +143,13 @@ pub async fn remove_server(
         }
         storage::save_profiles(&state.data_dir, &profiles)?;
     }
-    reconcile_profiles(&app, &state).await;
+    reconcile_profiles(&app, state).await;
     Ok(())
 }
 
-#[tauri::command]
 pub async fn select_server(
     app: AppHandle,
-    state: tauri::State<'_, AppState>,
+    state: &AppState,
     id: String,
 ) -> AppResult<ConnectionState> {
     let name = {
@@ -298,9 +277,8 @@ fn ensure_has_servers(fetched: &FetchedSubscription) -> AppResult<()> {
     Ok(())
 }
 
-#[tauri::command]
 pub async fn add_subscription(
-    state: tauri::State<'_, AppState>,
+    state: &AppState,
     url: String,
     name: Option<String>,
 ) -> AppResult<Subscription> {
@@ -335,10 +313,9 @@ pub async fn add_subscription(
     Ok(sub)
 }
 
-#[tauri::command]
 pub async fn update_subscription(
     app: AppHandle,
-    state: tauri::State<'_, AppState>,
+    state: &AppState,
     id: String,
 ) -> AppResult<Subscription> {
     let url = {
@@ -393,7 +370,7 @@ pub async fn update_subscription(
     // A refresh can retire servers just like a delete can: the panel dropped a
     // node, the merge dropped its id.
     if removed > 0 {
-        reconcile_profiles(&app, &state).await;
+        reconcile_profiles(&app, state).await;
     }
 
     if let Err(e) = app.emit(
@@ -409,12 +386,7 @@ pub async fn update_subscription(
     Ok(result)
 }
 
-#[tauri::command]
-pub async fn remove_subscription(
-    app: AppHandle,
-    state: tauri::State<'_, AppState>,
-    id: String,
-) -> AppResult<()> {
+pub async fn remove_subscription(app: AppHandle, state: &AppState, id: String) -> AppResult<()> {
     {
         let mut profiles = state.profiles.write().await;
         let before = profiles.subscriptions.len();
@@ -426,18 +398,13 @@ pub async fn remove_subscription(
     }
     // Deleting the subscription you are connected through used to leave the
     // dashboard claiming "connected" next to "no server selected".
-    reconcile_profiles(&app, &state).await;
+    reconcile_profiles(&app, state).await;
     Ok(())
 }
 
 /// Star / unstar a server. Persisted on the entry itself so it survives a
 /// subscription refresh (`merge_servers` carries it over).
-#[tauri::command]
-pub async fn set_server_favorite(
-    state: tauri::State<'_, AppState>,
-    id: String,
-    favorite: bool,
-) -> AppResult<()> {
+pub async fn set_server_favorite(state: &AppState, id: String, favorite: bool) -> AppResult<()> {
     let mut profiles = state.profiles.write().await;
     let server = profiles
         .find_server_mut(&id)
@@ -452,20 +419,15 @@ pub async fn set_server_favorite(
 
 /// Persist the order the user dragged the subscription groups into. The stored
 /// vector *is* the order — `list_servers` hands it back as delivered.
-#[tauri::command]
-pub async fn reorder_subscriptions(
-    state: tauri::State<'_, AppState>,
-    ids: Vec<String>,
-) -> AppResult<()> {
+pub async fn reorder_subscriptions(state: &AppState, ids: Vec<String>) -> AppResult<()> {
     let mut profiles = state.profiles.write().await;
     apply_order(&mut profiles.subscriptions, &ids);
     storage::save_profiles(&state.data_dir, &profiles)?;
     Ok(())
 }
 
-#[tauri::command]
 pub async fn rename_subscription(
-    state: tauri::State<'_, AppState>,
+    state: &AppState,
     id: String,
     name: String,
 ) -> AppResult<Subscription> {
@@ -488,9 +450,8 @@ pub async fn rename_subscription(
     Ok(result)
 }
 
-#[tauri::command]
 pub async fn set_subscription_auto_update(
-    state: tauri::State<'_, AppState>,
+    state: &AppState,
     id: String,
     hours: u32,
 ) -> AppResult<()> {
@@ -552,7 +513,7 @@ async fn refresh_due_subscriptions(app: &AppHandle, failing: &mut HashSet<String
     // The read guard is dropped before any fetch: `update_subscription` takes
     // the write lock itself, and a refresh can sit on the network for seconds.
     let due: Vec<String> = {
-        let state = app.state::<AppState>();
+        let state = app.state();
         let profiles = state.profiles.read().await;
         failing.retain(|id| profiles.subscriptions.iter().any(|s| &s.id == id));
         profiles
@@ -563,11 +524,11 @@ async fn refresh_due_subscriptions(app: &AppHandle, failing: &mut HashSet<String
             .collect()
     };
     for id in due {
-        let state = app.state::<AppState>();
+        let state = app.state();
         match update_subscription(app.clone(), state, id.clone()).await {
             Ok(sub) => {
                 if failing.remove(&id) {
-                    app.state::<AppState>().logs.push_now(
+                    app.state().logs.push_now(
                         "info",
                         format!("[umbra] auto-update recovered: {}", sub.name),
                     );
@@ -579,7 +540,7 @@ async fn refresh_due_subscriptions(app: &AppHandle, failing: &mut HashSet<String
             // otherwise repeat the same line every 15 minutes.
             Err(e) => {
                 if failing.insert(id.clone()) {
-                    app.state::<AppState>().logs.push_now(
+                    app.state().logs.push_now(
                         "warn",
                         format!("[umbra] auto-update failed for subscription {id}: {e}"),
                     );
@@ -595,7 +556,7 @@ async fn refresh_due_subscriptions(app: &AppHandle, failing: &mut HashSet<String
 /// The first sweep doubles as the catch-up for time spent closed — a 12-hour
 /// subscription last refreshed two days ago is due the moment the app is back.
 pub fn spawn_auto_updater(app: AppHandle) {
-    tauri::async_runtime::spawn(async move {
+    tokio::spawn(async move {
         let mut ticker = tokio::time::interval_at(
             tokio::time::Instant::now() + AUTO_UPDATE_STARTUP_DELAY,
             AUTO_UPDATE_TICK,

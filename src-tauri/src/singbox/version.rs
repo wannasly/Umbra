@@ -16,19 +16,17 @@ pub fn core_path(data_dir: &Path) -> PathBuf {
 /// Install the core shipped inside the bundle when the user has none yet.
 /// Without this the first connect needs a GitHub download, which fails wherever
 /// GitHub is blocked — exactly the networks this app exists for.
-pub fn install_bundled_core(app: &tauri::AppHandle, data_dir: &Path) {
-    use tauri::Manager;
-
+pub fn install_bundled_core(data_dir: &Path) {
     let target = core_path(data_dir);
     if target.exists() {
         return;
     }
-    let Ok(bundled) = app.path().resolve(
-        "resources/sing-box.exe",
-        tauri::path::BaseDirectory::Resource,
-    ) else {
-        return;
-    };
+    let beside_exe = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|p| p.join("resources/sing-box.exe")));
+    let bundled = beside_exe.filter(|p| p.exists()).unwrap_or_else(|| {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/sing-box.exe")
+    });
     if !bundled.exists() {
         return;
     }
@@ -101,8 +99,7 @@ pub async fn probe_version(core: PathBuf) -> AppResult<Option<String>> {
         .map_err(|e| AppError::Internal(format!("version probe task failed: {e}")))
 }
 
-#[tauri::command]
-pub async fn get_core_status(state: tauri::State<'_, AppState>) -> AppResult<CoreStatus> {
+pub async fn get_core_status(state: &AppState) -> AppResult<CoreStatus> {
     let path = core_path(&state.data_dir);
     let installed = path.exists();
     let version = if installed {

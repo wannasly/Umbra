@@ -147,16 +147,17 @@ fn decode_header_text(value: &str) -> Option<String> {
     };
     let payload: String = payload.chars().filter(|c| !c.is_whitespace()).collect();
     let mut padded = payload;
-    while padded.len() % 4 != 0 {
+    while !padded.len().is_multiple_of(4) {
         padded.push('=');
     }
-    for attempt in [STANDARD.decode(&padded), URL_SAFE.decode(&padded)] {
-        if let Ok(bytes) = attempt {
-            if let Ok(text) = String::from_utf8(bytes) {
-                let text = text.trim().to_string();
-                if !text.is_empty() {
-                    return Some(text);
-                }
+    for bytes in [STANDARD.decode(&padded), URL_SAFE.decode(&padded)]
+        .into_iter()
+        .flatten()
+    {
+        if let Ok(text) = String::from_utf8(bytes) {
+            let text = text.trim().to_string();
+            if !text.is_empty() {
+                return Some(text);
             }
         }
     }
@@ -236,15 +237,16 @@ fn decode_body(body: &str) -> AppResult<String> {
 
     let compact: String = trimmed.chars().filter(|c| !c.is_whitespace()).collect();
     let mut padded = compact;
-    while padded.len() % 4 != 0 {
+    while !padded.len().is_multiple_of(4) {
         padded.push('=');
     }
-    for attempt in [STANDARD.decode(&padded), URL_SAFE.decode(&padded)] {
-        if let Ok(bytes) = attempt {
-            let decoded = String::from_utf8_lossy(&bytes);
-            if decoded.contains("://") {
-                return Ok(decoded.into_owned());
-            }
+    for bytes in [STANDARD.decode(&padded), URL_SAFE.decode(&padded)]
+        .into_iter()
+        .flatten()
+    {
+        let decoded = String::from_utf8_lossy(&bytes);
+        if decoded.contains("://") {
+            return Ok(decoded.into_owned());
         }
     }
 

@@ -1,15 +1,14 @@
 //! Settings and misc app commands.
 
 use serde_json::Value;
-use tauri_plugin_autostart::ManagerExt;
 
 use crate::error::{AppError, AppResult};
-use crate::models::{ConnectionState, Mode, Settings};
+use crate::models::{Mode, Settings};
 use crate::proxy::elevation;
 use crate::state::AppState;
 use crate::storage;
 
-/// Shallow-merge a camelCase JSON patch (Partial<Settings> from TS) onto the
+/// Shallow-merge a camelCase settings patch onto the
 /// current settings via their wire representation.
 fn merge_settings(current: &Settings, patch: &Value) -> AppResult<Settings> {
     let patch_obj = patch
@@ -28,63 +27,33 @@ fn merge_settings(current: &Settings, patch: &Value) -> AppResult<Settings> {
         .map_err(|e| AppError::Parse(format!("invalid settings patch: {e}")))
 }
 
-#[tauri::command]
-pub async fn get_settings(state: tauri::State<'_, AppState>) -> AppResult<Settings> {
-    Ok(state.settings.read().await.clone())
-}
-
-#[tauri::command]
 pub async fn set_settings(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
+    app: crate::runtime::AppHandle,
+    state: &AppState,
     patch: Value,
 ) -> AppResult<Settings> {
     let mut settings = state.settings.write().await;
     let merged = merge_settings(&settings, &patch)?;
     storage::save_settings(&state.data_dir, &merged)?;
 
-    if patch.get("autostart").is_some() {
-        let autolaunch = app.autolaunch();
-        let result = if merged.autostart {
-            autolaunch.enable()
-        } else {
-            autolaunch.disable()
-        };
-        if let Err(e) = result {
-            eprintln!("[umbra] failed to update autostart: {e}");
+    if settings.autostart != merged.autostart {
+        if let Err(error) = crate::runtime::set_autostart(merged.autostart) {
+            storage::save_settings(&state.data_dir, &settings)?;
+            return Err(error);
         }
     }
-
-    let language_changed = settings.language != merged.language;
     *settings = merged.clone();
     drop(settings);
-
-    // Tray labels are baked into the menu items, so a language switch needs a rebuild.
-    if language_changed {
-        if let Err(e) = crate::tray::build(&app, &merged.language, merged.mode) {
-            eprintln!("[umbra] failed to rebuild tray after language change: {e}");
-        }
-    }
+    let _ = app;
 
     Ok(merged)
 }
 
-#[tauri::command]
-pub async fn get_connection_state(state: tauri::State<'_, AppState>) -> AppResult<ConnectionState> {
-    Ok(state.conn.read().await.clone())
-}
-
-#[tauri::command]
-pub async fn open_data_dir(state: tauri::State<'_, AppState>) -> AppResult<()> {
+pub async fn open_data_dir(state: &AppState) -> AppResult<()> {
     std::process::Command::new("explorer.exe")
         .arg(&state.data_dir)
         .spawn()?;
     Ok(())
-}
-
-#[tauri::command]
-pub async fn is_elevated() -> AppResult<bool> {
-    Ok(elevation::is_elevated())
 }
 
 /// Relaunch under UAC to run TUN. The elevated instance is a fresh process
@@ -92,11 +61,7 @@ pub async fn is_elevated() -> AppResult<bool> {
 /// here — `set_mode` rejected before it could store it. Persist first and roll
 /// back on a declined prompt: writing after `ShellExecuteW` would race the new
 /// instance's own load when UAC auto-approves.
-#[tauri::command]
-pub async fn relaunch_elevated(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
-) -> AppResult<()> {
+pub async fn relaunch_elevated(app: crate::runtime::AppHandle, state: &AppState) -> AppResult<()> {
     let previous = {
         let mut settings = state.settings.write().await;
         let previous = settings.mode;

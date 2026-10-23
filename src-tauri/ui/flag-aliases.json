@@ -1,0 +1,376 @@
+{
+  "aliases": {
+    "NL": [
+      "netherlands",
+      "holland",
+      "нидерланд",
+      "голланд",
+      "амстердам",
+      "amsterdam"
+    ],
+    "DE": [
+      "germany",
+      "герман",
+      "франкфурт",
+      "frankfurt"
+    ],
+    "PL": [
+      "poland",
+      "польш",
+      "варшав",
+      "warsaw"
+    ],
+    "FI": [
+      "finland",
+      "финлянд",
+      "хельсинки",
+      "helsinki"
+    ],
+    "FR": [
+      "france",
+      "франц",
+      "париж",
+      "paris"
+    ],
+    "GB": [
+      "united kingdom",
+      "britain",
+      "england",
+      "великобритан",
+      "англи",
+      "лондон",
+      "london"
+    ],
+    "US": [
+      "united states",
+      "usa",
+      "америк",
+      "сша"
+    ],
+    "CA": [
+      "canada",
+      "канад"
+    ],
+    "JP": [
+      "japan",
+      "япони",
+      "токио",
+      "tokyo"
+    ],
+    "KR": [
+      "south korea",
+      "korea",
+      "коре"
+    ],
+    "CN": [
+      "china",
+      "китай",
+      "китае"
+    ],
+    "HK": [
+      "hong kong",
+      "гонконг"
+    ],
+    "TW": [
+      "taiwan",
+      "тайван"
+    ],
+    "SG": [
+      "singapore",
+      "сингапур"
+    ],
+    "IN": [
+      "india",
+      "инди"
+    ],
+    "TR": [
+      "turkey",
+      "turkiye",
+      "турци",
+      "стамбул",
+      "istanbul"
+    ],
+    "AE": [
+      "emirates",
+      "эмират",
+      "дубай",
+      "dubai"
+    ],
+    "IL": [
+      "israel",
+      "израил"
+    ],
+    "SE": [
+      "sweden",
+      "швеци",
+      "стокгольм",
+      "stockholm"
+    ],
+    "NO": [
+      "norway",
+      "норвег"
+    ],
+    "DK": [
+      "denmark",
+      "дани"
+    ],
+    "IS": [
+      "iceland",
+      "исланди"
+    ],
+    "IE": [
+      "ireland",
+      "ирланди"
+    ],
+    "ES": [
+      "spain",
+      "испани"
+    ],
+    "PT": [
+      "portugal",
+      "португал"
+    ],
+    "IT": [
+      "italy",
+      "итали",
+      "милан",
+      "milan"
+    ],
+    "CH": [
+      "switzerland",
+      "швейцар",
+      "цюрих",
+      "zurich"
+    ],
+    "AT": [
+      "austria",
+      "австри",
+      "вена "
+    ],
+    "BE": [
+      "belgium",
+      "бельги"
+    ],
+    "LU": [
+      "luxembourg",
+      "люксембург"
+    ],
+    "CZ": [
+      "czech",
+      "чехи",
+      "прага",
+      "prague"
+    ],
+    "SK": [
+      "slovakia",
+      "словаки"
+    ],
+    "SI": [
+      "slovenia",
+      "словени"
+    ],
+    "HU": [
+      "hungary",
+      "венгри"
+    ],
+    "RO": [
+      "romania",
+      "румын"
+    ],
+    "BG": [
+      "bulgaria",
+      "болгар"
+    ],
+    "RS": [
+      "serbia",
+      "серби"
+    ],
+    "HR": [
+      "croatia",
+      "хорват"
+    ],
+    "GR": [
+      "greece",
+      "греци"
+    ],
+    "CY": [
+      "cyprus",
+      "кипр"
+    ],
+    "MT": [
+      "malta",
+      "мальт"
+    ],
+    "EE": [
+      "estonia",
+      "эстони",
+      "таллин"
+    ],
+    "LV": [
+      "latvia",
+      "латви",
+      "рига"
+    ],
+    "LT": [
+      "lithuania",
+      "литв"
+    ],
+    "UA": [
+      "ukraine",
+      "украин"
+    ],
+    "MD": [
+      "moldova",
+      "молдов"
+    ],
+    "BY": [
+      "belarus",
+      "беларус",
+      "белорус"
+    ],
+    "RU": [
+      "russia",
+      "росси",
+      "москв",
+      "moscow",
+      "питер"
+    ],
+    "KZ": [
+      "kazakhstan",
+      "казахстан"
+    ],
+    "UZ": [
+      "uzbekistan",
+      "узбекистан"
+    ],
+    "KG": [
+      "kyrgyz",
+      "киргиз",
+      "кыргыз"
+    ],
+    "AM": [
+      "armenia",
+      "армени",
+      "ереван"
+    ],
+    "GE": [
+      "georgia",
+      "грузи",
+      "тбилиси"
+    ],
+    "AZ": [
+      "azerbaijan",
+      "азербайджан"
+    ],
+    "AU": [
+      "australia",
+      "австрали",
+      "сидней",
+      "sydney"
+    ],
+    "BR": [
+      "brazil",
+      "бразил"
+    ],
+    "AR": [
+      "argentina",
+      "аргентин"
+    ],
+    "MX": [
+      "mexico",
+      "мексик"
+    ],
+    "ZA": [
+      "south africa",
+      "юар "
+    ],
+    "EG": [
+      "egypt",
+      "египет"
+    ],
+    "IR": [
+      "iran",
+      "иран"
+    ],
+    "VN": [
+      "vietnam",
+      "вьетнам"
+    ],
+    "TH": [
+      "thailand",
+      "таиланд"
+    ],
+    "ID": [
+      "indonesia",
+      "индонези"
+    ],
+    "MY": [
+      "malaysia",
+      "малайзи"
+    ],
+    "PH": [
+      "philippines",
+      "филиппин"
+    ]
+  },
+  "bare": [
+    "NL",
+    "DE",
+    "PL",
+    "FI",
+    "FR",
+    "GB",
+    "UK",
+    "US",
+    "CA",
+    "JP",
+    "KR",
+    "CN",
+    "HK",
+    "TW",
+    "SG",
+    "TR",
+    "AE",
+    "IL",
+    "SE",
+    "DK",
+    "IE",
+    "ES",
+    "PT",
+    "CH",
+    "BE",
+    "LU",
+    "CZ",
+    "SK",
+    "SI",
+    "HU",
+    "RO",
+    "BG",
+    "RS",
+    "HR",
+    "GR",
+    "CY",
+    "MT",
+    "EE",
+    "LV",
+    "LT",
+    "UA",
+    "MD",
+    "RU",
+    "KZ",
+    "UZ",
+    "KG",
+    "GE",
+    "AZ",
+    "AU",
+    "BR",
+    "AR",
+    "MX",
+    "ZA",
+    "EG",
+    "IR",
+    "VN",
+    "TH",
+    "PH"
+  ]
+}

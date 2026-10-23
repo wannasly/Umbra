@@ -2,13 +2,12 @@
 
 use std::time::Duration;
 
+use crate::runtime::AppHandle;
 use futures_util::stream::{self, StreamExt};
-use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::{lookup_host, TcpStream};
 use tokio::time::{timeout, Instant};
 
 use crate::events::{PingResult, EV_PING_RESULT};
-use crate::state::AppState;
 use crate::storage;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
@@ -49,6 +48,10 @@ pub async fn ping_many(app: AppHandle, targets: Vec<PingTarget>) {
     }))
     .buffer_unordered(CONCURRENCY);
     while let Some((id, latency)) = stream.next().await {
+        // Keep the retained UI's profile snapshot current before waking it.
+        if let Some(server) = app.state().profiles.write().await.find_server_mut(&id) {
+            server.last_ping_ms = latency;
+        }
         let _ = app.emit(
             EV_PING_RESULT,
             &PingResult {
@@ -58,7 +61,7 @@ pub async fn ping_many(app: AppHandle, targets: Vec<PingTarget>) {
         );
         results.push((id, latency));
     }
-    let state = app.state::<AppState>();
+    let state = app.state();
     let mut profiles = state.profiles.write().await;
     for (id, latency) in &results {
         if let Some(server) = profiles.find_server_mut(id) {

@@ -1,0 +1,375 @@
+{
+  "version": 2,
+  "manual": [
+    {
+      "id": "srv-hy2",
+      "name": "🇫🇮 Helsinki HY2",
+      "protocol": "hysteria2",
+      "server": "fi.example.com",
+      "port": 443,
+      "password": "mockpassword",
+      "insecure": false,
+      "sni": "fi.example.com",
+      "alpn": [
+        "h3"
+      ],
+      "lastPingMs": 38,
+      "favorite": false,
+      "totalUp": 500000,
+      "totalDown": 12000000,
+      "raw": "hy2://mockpassword@fi.example.com:443#%D0%A4%D0%B8%D0%BD%D0%BB%D1%8F%D0%BD%D0%B4%D0%B8%D1%8F%20HY2"
+    },
+    {
+      "id": "srv-1",
+      "name": "🇳🇱 Amsterdam-1",
+      "protocol": "vless",
+      "server": "nl1.example.com",
+      "port": 443,
+      "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+      "flow": "xtls-rprx-vision",
+      "security": "reality",
+      "sni": "www.microsoft.com",
+      "fingerprint": "chrome",
+      "publicKey": "mockpublickey00000000000000000000000000000A",
+      "shortId": "6ba85179",
+      "insecure": false,
+      "alpn": [],
+      "transport": {
+        "type": "tcp"
+      },
+      "lastPingMs": 43,
+      "favorite": true,
+      "totalUp": 41300000000,
+      "totalDown": 318700000000,
+      "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@nl1.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%F0%9F%87%B3%F0%9F%87%B1%20Amsterdam-1"
+    }
+  ],
+  "subscriptions": [
+    {
+      "id": "sub-1",
+      "name": "Example Network",
+      "url": "https://panel.example.com/sub/abcdef123456",
+      "updatedAt": "2026-10-23T11:06:09.769Z",
+      "quota": {
+        "upload": 12000000000,
+        "download": 88000000000,
+        "total": 300000000000,
+        "expire": 1794488769
+      },
+      "autoUpdateHours": 12,
+      "supportUrl": "https://support.example.com",
+      "webPageUrl": "https://panel.example.com/account",
+      "panelTitle": "Example Network",
+      "servers": [
+        {
+          "id": "sub1-info-1",
+          "name": "Осталось дней — 19",
+          "protocol": "vless",
+          "server": "0.0.0.0",
+          "port": 1,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": null,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@0.0.0.0:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%D0%9E%D1%81%D1%82%D0%B0%D0%BB%D0%BE%D1%81%D1%8C%20%D0%B4%D0%BD%D0%B5%D0%B9%20%E2%80%94%2019"
+        },
+        {
+          "id": "sub1-info-2",
+          "name": "Если не работает, нажмите кнопку обновления",
+          "protocol": "vless",
+          "server": "127.0.0.1",
+          "port": 1,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": null,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@127.0.0.1:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%D0%95%D1%81%D0%BB%D0%B8%20%D0%BD%D0%B5%20%D1%80%D0%B0%D0%B1%D0%BE%D1%82%D0%B0%D0%B5%D1%82%2C%20%D0%BD%D0%B0%D0%B6%D0%BC%D0%B8%D1%82%D0%B5%20%D0%BA%D0%BD%D0%BE%D0%BF%D0%BA%D1%83%20%D0%BE%D0%B1%D0%BD%D0%BE%D0%B2%D0%BB%D0%B5%D0%BD%D0%B8%D1%8F"
+        },
+        {
+          "id": "sub1-1",
+          "name": "🇵🇱 Poland #1",
+          "protocol": "vless",
+          "server": "pl1.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 38,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@pl1.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%F0%9F%87%B5%F0%9F%87%B1%20Poland%20%231"
+        },
+        {
+          "id": "sub1-2",
+          "name": "🇵🇱 Poland #2",
+          "protocol": "vless",
+          "server": "pl2.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 52,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@pl2.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%F0%9F%87%B5%F0%9F%87%B1%20Poland%20%232"
+        },
+        {
+          "id": "sub1-3",
+          "name": "🇫🇮 Finland #1",
+          "protocol": "vless",
+          "server": "fi1.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 61,
+          "favorite": true,
+          "totalUp": 512000000,
+          "totalDown": 7400000000,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@fi1.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%F0%9F%87%AB%F0%9F%87%AE%20Finland%20%231"
+        },
+        {
+          "id": "sub1-4",
+          "name": "Germany · Frankfurt",
+          "protocol": "vless",
+          "server": "de3.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": null,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@de3.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#Germany%20%C2%B7%20Frankfurt"
+        },
+        {
+          "id": "sub1-5",
+          "name": "US-2 New York",
+          "protocol": "vless",
+          "server": "us2.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 173,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@us2.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#US-2%20New%20York"
+        },
+        {
+          "id": "srv-2",
+          "name": "🇩🇪 Frankfurt-2",
+          "protocol": "vless",
+          "server": "de2.example.com",
+          "port": 8443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "",
+          "security": "tls",
+          "sni": "de2.example.com",
+          "fingerprint": "chrome",
+          "publicKey": "",
+          "shortId": "",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "ws",
+            "path": "/ws",
+            "host": "de2.example.com"
+          },
+          "lastPingMs": 71,
+          "favorite": false,
+          "totalUp": 2140000000,
+          "totalDown": 9820000000,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@de2.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%F0%9F%87%A9%F0%9F%87%AA%20Frankfurt-2"
+        }
+      ]
+    },
+    {
+      "id": "sub-2",
+      "name": "Unlimited Demo",
+      "url": "https://unlimited.example.com/api/sub/example-token",
+      "updatedAt": "2026-10-22T11:06:09.770Z",
+      "quota": {
+        "upload": 0,
+        "download": 127879592133,
+        "total": 0,
+        "expire": 1794402369
+      },
+      "autoUpdateHours": 24,
+      "supportUrl": null,
+      "webPageUrl": null,
+      "panelTitle": null,
+      "servers": [
+        {
+          "id": "sub2-info",
+          "name": "Подписка: https://unlimited.example.com/renew",
+          "protocol": "vless",
+          "server": "0.0.0.0",
+          "port": 1,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": null,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@0.0.0.0:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%D0%9F%D0%BE%D0%B4%D0%BF%D0%B8%D1%81%D0%BA%D0%B0%3A%20https%3A%2F%2Funlimited.example.com%2Frenew"
+        },
+        {
+          "id": "sub2-1",
+          "name": "NL-1 · reality",
+          "protocol": "vless",
+          "server": "nl9.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 44,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@nl9.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#NL-1%20%C2%B7%20reality"
+        },
+        {
+          "id": "sub2-2",
+          "name": "Турция (Стамбул)",
+          "protocol": "vless",
+          "server": "tr1.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 96,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@tr1.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%D0%A2%D1%83%D1%80%D1%86%D0%B8%D1%8F%20(%D0%A1%D1%82%D0%B0%D0%BC%D0%B1%D1%83%D0%BB)"
+        },
+        {
+          "id": "sub2-3",
+          "name": "Сервер без страны",
+          "protocol": "vless",
+          "server": "x1.example.com",
+          "port": 443,
+          "uuid": "bf000d23-0752-40b4-affe-68f7707a9661",
+          "flow": "xtls-rprx-vision",
+          "security": "reality",
+          "sni": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "mockpublickey00000000000000000000000000000A",
+          "shortId": "6ba85179",
+          "insecure": false,
+          "alpn": [],
+          "transport": {
+            "type": "tcp"
+          },
+          "lastPingMs": 120,
+          "favorite": false,
+          "totalUp": 0,
+          "totalDown": 0,
+          "raw": "vless://bf000d23-0752-40b4-affe-68f7707a9661@x1.example.com:443?security=reality&sni=www.microsoft.com&fp=chrome&pbk=mock&sid=6ba85179&flow=xtls-rprx-vision#%D0%A1%D0%B5%D1%80%D0%B2%D0%B5%D1%80%20%D0%B1%D0%B5%D0%B7%20%D1%81%D1%82%D1%80%D0%B0%D0%BD%D1%8B"
+        }
+      ]
+    }
+  ]
+}

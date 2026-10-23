@@ -1,0 +1,170 @@
+{
+  "rootProcessId": 26808,
+  "processIds": [
+    26808,
+    19936,
+    26612,
+    27364,
+    26436,
+    25776,
+    14864
+  ],
+  "durationSeconds": 30.72,
+  "cpuPercentOfOneCore": 166.844,
+  "cpuPercentOfMachine": 10.427,
+  "samples": [
+    {
+      "elapsed": 2.57,
+      "privateWorkingSetMiB": 198.32,
+      "workingSetMiB": 475.15,
+      "privateCommitMiB": 387.95,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 4.25,
+      "privateWorkingSetMiB": 206.6,
+      "workingSetMiB": 483.48,
+      "privateCommitMiB": 329.33,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 5.96,
+      "privateWorkingSetMiB": 208.18,
+      "workingSetMiB": 485.96,
+      "privateCommitMiB": 330.71,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 7.65,
+      "privateWorkingSetMiB": 208.41,
+      "workingSetMiB": 486.21,
+      "privateCommitMiB": 330.76,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 9.33,
+      "privateWorkingSetMiB": 208.41,
+      "workingSetMiB": 486.22,
+      "privateCommitMiB": 330.7,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 10.96,
+      "privateWorkingSetMiB": 208.5,
+      "workingSetMiB": 486.3,
+      "privateCommitMiB": 330.79,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 12.6,
+      "privateWorkingSetMiB": 208.49,
+      "workingSetMiB": 486.3,
+      "privateCommitMiB": 330.78,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 14.23,
+      "privateWorkingSetMiB": 203.98,
+      "workingSetMiB": 481.96,
+      "privateCommitMiB": 325.67,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 15.92,
+      "privateWorkingSetMiB": 204.15,
+      "workingSetMiB": 482.15,
+      "privateCommitMiB": 325.84,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 66.75,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 17.67,
+      "privateWorkingSetMiB": 204.35,
+      "workingSetMiB": 482.61,
+      "privateCommitMiB": 334.23,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 19.4,
+      "privateWorkingSetMiB": 204.55,
+      "workingSetMiB": 482.85,
+      "privateCommitMiB": 334.43,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 21.04,
+      "privateWorkingSetMiB": 204.71,
+      "workingSetMiB": 483.0,
+      "privateCommitMiB": 327.96,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 22.81,
+      "privateWorkingSetMiB": 204.74,
+      "workingSetMiB": 483.04,
+      "privateCommitMiB": 328.0,
+      "gpuEnginePercent": 2.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 24.53,
+      "privateWorkingSetMiB": 205.44,
+      "workingSetMiB": 491.95,
+      "privateCommitMiB": 329.07,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 26.37,
+      "privateWorkingSetMiB": 204.49,
+      "workingSetMiB": 491.01,
+      "privateCommitMiB": 328.12,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 67.25,
+      "gpuSharedMiB": 5.32
+    },
+    {
+      "elapsed": 28.16,
+      "privateWorkingSetMiB": 204.44,
+      "workingSetMiB": 490.96,
+      "privateCommitMiB": 328.0,
+      "gpuEnginePercent": 5.0,
+      "gpuDedicatedMiB": 67.45,
+      "gpuSharedMiB": 4.32
+    },
+    {
+      "elapsed": 29.9,
+      "privateWorkingSetMiB": 204.68,
+      "workingSetMiB": 491.2,
+      "privateCommitMiB": 339.43,
+      "gpuEnginePercent": 3.0,
+      "gpuDedicatedMiB": 67.88,
+      "gpuSharedMiB": 5.32
+    }
+  ]
+}

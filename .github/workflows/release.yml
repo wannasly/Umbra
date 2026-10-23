@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish verified installer and portable archive as a GitHub release
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -20,19 +25,25 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
 
-      - name: Install frontend dependencies
-        run: npm ci
+      - name: Determine and validate package version
+        id: package
+        shell: pwsh
+        env:
+          PUBLISH_RELEASE: ${{ inputs.publish_release }}
+        run: |
+          $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "Cannot read package version" }
+          $version = ($metadata.packages | Where-Object name -eq 'umbra').version
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") { throw "Tag and package version do not match" }
+          if ($env:PUBLISH_RELEASE -eq 'true' -and $env:GITHUB_REF -ne 'refs/heads/main') { throw "Manual publication must use main" }
+          if (-not (Test-Path -LiteralPath "docs/RELEASE_v$version.md")) { throw "Release notes are missing" }
+          "version=$version" >> $env:GITHUB_OUTPUT
 
       - name: Download verified sing-box core
         shell: pwsh
@@ -51,32 +62,23 @@ jobs:
 
       - name: Test
         run: |
-          npm run build
-          cargo test --manifest-path src-tauri/Cargo.toml
+          cargo fmt --all -- --check
+          cargo test --workspace --locked
+          cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 
-      - name: Build NSIS installer
-        run: npm run tauri build
+      - name: Build native Rust application
+        run: cargo build --release --locked
+
+      - name: Install NSIS
+        run: choco install nsis --no-progress -y
 
       - name: Package release files
         shell: pwsh
-        run: |
-          $version = (Get-Content src-tauri/tauri.conf.json | ConvertFrom-Json).version
-          $release = New-Item -ItemType Directory -Force -Path release
-          $portable = New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP/Umbra-portable"
-          New-Item -ItemType Directory -Force -Path "$portable/resources" | Out-Null
-          Copy-Item -LiteralPath "src-tauri/target/release/umbra.exe" -Destination "$portable/Umbra.exe"
-          Copy-Item -LiteralPath "src-tauri/resources/sing-box.exe" -Destination "$portable/resources/sing-box.exe"
-          Copy-Item -LiteralPath "LICENSE" -Destination "$portable/LICENSE.txt"
-          Copy-Item -LiteralPath "THIRD_PARTY_NOTICES.md" -Destination "$portable/THIRD_PARTY_NOTICES.md"
-          Compress-Archive -Path "$portable/*" -DestinationPath "$release/Umbra_${version}_windows_x64_portable.zip"
-          $installer = Get-ChildItem "src-tauri/target/release/bundle/nsis/*setup.exe" | Select-Object -First 1
-          if (-not $installer) { throw "NSIS installer was not produced" }
-          Copy-Item -LiteralPath $installer.FullName -Destination "$release/Umbra_${version}_x64-setup.exe"
-          Copy-Item -LiteralPath "THIRD_PARTY_NOTICES.md" -Destination "$release/THIRD_PARTY_NOTICES.md"
-          Get-ChildItem "$release/*" -File |
-            Where-Object Name -ne "SHA256SUMS.txt" |
-            ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } |
-            Set-Content -Encoding ascii "$release/SHA256SUMS.txt"
+        run: ./scripts/package.ps1
+
+      - name: Verify portable archive and installed application
+        shell: pwsh
+        run: ./scripts/test-package.ps1
 
       - uses: actions/upload-artifact@v4
         with:
@@ -84,8 +86,11 @@ jobs:
           path: release/*
 
       - name: Publish GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
+          tag_name: v${{ steps.package.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          body_path: docs/RELEASE_v${{ steps.package.outputs.version }}.md
           files: release/*

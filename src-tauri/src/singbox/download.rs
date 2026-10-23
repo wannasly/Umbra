@@ -6,7 +6,6 @@ use std::time::Duration;
 use futures_util::StreamExt;
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
-use tauri::Emitter;
 use tokio::io::AsyncWriteExt;
 
 use crate::error::{AppError, AppResult};
@@ -185,7 +184,12 @@ async fn latest_release(state: &AppState) -> AppResult<ReleaseInfo> {
     Ok(info)
 }
 
-fn emit_progress(app: &tauri::AppHandle, phase: DownloadPhase, downloaded: u64, total: u64) {
+fn emit_progress(
+    app: &crate::runtime::AppHandle,
+    phase: DownloadPhase,
+    downloaded: u64,
+    total: u64,
+) {
     if let Err(e) = app.emit(
         EV_DOWNLOAD_PROGRESS,
         DownloadProgress {
@@ -198,9 +202,8 @@ fn emit_progress(app: &tauri::AppHandle, phase: DownloadPhase, downloaded: u64, 
     }
 }
 
-#[tauri::command]
-pub async fn check_core_update(state: tauri::State<'_, AppState>) -> AppResult<UpdateCheck> {
-    let latest = latest_release(state.inner()).await?;
+pub async fn check_core_update(state: &AppState) -> AppResult<UpdateCheck> {
+    let latest = latest_release(state).await?;
     let current = probe_version(core_path(&state.data_dir)).await?;
     let available = update_available(current.as_deref(), &latest.version);
     Ok(UpdateCheck {
@@ -210,10 +213,9 @@ pub async fn check_core_update(state: tauri::State<'_, AppState>) -> AppResult<U
     })
 }
 
-#[tauri::command]
 pub async fn download_core(
-    app: tauri::AppHandle,
-    state: tauri::State<'_, AppState>,
+    app: crate::runtime::AppHandle,
+    state: &AppState,
     version: Option<String>,
 ) -> AppResult<()> {
     let client = gh_client()?;
@@ -226,7 +228,7 @@ pub async fn download_core(
             };
             fetch_release(&client, Some(&tag)).await?
         }
-        None => latest_release(state.inner()).await?,
+        None => latest_release(state).await?,
     };
 
     let mirror = state.settings.read().await.github_mirror.clone();
@@ -246,7 +248,7 @@ pub async fn download_core(
 
 #[allow(clippy::too_many_arguments)]
 async fn download_and_install(
-    app: &tauri::AppHandle,
+    app: &crate::runtime::AppHandle,
     client: &reqwest::Client,
     url: &str,
     info: &ReleaseInfo,
