@@ -49,6 +49,7 @@ try {
         $null = $smokeProcess.Handle
         Start-Sleep -Seconds 3
         $startupLog = Get-Content -LiteralPath $stderr -Raw
+        Write-Output $startupLog
         if ($smokeProcess.HasExited) { throw "Installed application exited during startup.`n$startupLog" }
         if ($startupLog -match '(?m)^Umbra:') { throw "Installed application reported a startup error.`n$startupLog" }
         if (-not (Test-Path -LiteralPath (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Installed application did not discover its bundled core.' }

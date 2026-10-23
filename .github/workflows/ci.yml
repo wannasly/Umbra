@@ -60,6 +60,7 @@ jobs:
           try {
             Start-Sleep -Seconds 3
             $startupLog = Get-Content -LiteralPath $stderr -Raw
+            Write-Output $startupLog
             if ($app.HasExited -or $startupLog -match '(?m)^Umbra:') { throw "Native startup failed.`n$startupLog" }
             if (-not (Test-Path (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Bundled core was not discovered' }
           } finally {
