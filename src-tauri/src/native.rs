@@ -2146,9 +2146,9 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
                     Ok(image) => {
                         assert!(
                             image
-                                .as_bytes()
-                                .chunks_exact(4)
-                                .any(|pixel| { pixel[0] > 4 || pixel[1] > 4 || pixel[2] > 4 }),
+                                .as_slice()
+                                .iter()
+                                .any(|pixel| pixel.r > 4 || pixel.g > 4 || pixel.b > 4),
                             "snapshot must contain a rendered interface"
                         );
                         image::save_buffer(
