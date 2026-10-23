@@ -25,6 +25,8 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Download verified sing-box core
         shell: pwsh
@@ -45,3 +47,28 @@ jobs:
       - run: cargo test --workspace --locked
       - run: cargo clippy --workspace --all-targets --locked -- -D warnings
       - run: cargo check --features smoke-test --locked
+
+      - name: Verify native startup on clean Windows
+        shell: pwsh
+        run: |
+          cargo build --locked
+          if ($LASTEXITCODE -ne 0) { throw 'Native build failed' }
+          $env:UMBRA_DATA_DIR = Join-Path $env:RUNNER_TEMP 'UmbraNativeStartup'
+          $stderr = Join-Path $env:RUNNER_TEMP 'umbra-startup.stderr.log'
+          $app = Start-Process target/debug/umbra.exe -PassThru -WindowStyle Hidden -RedirectStandardError $stderr
+          $null = $app.Handle
+          try {
+            Start-Sleep -Seconds 3
+            $startupLog = Get-Content -LiteralPath $stderr -Raw
+            Write-Output $startupLog
+            if ($app.HasExited -or $startupLog -match '(?m)^Umbra:') { throw "Native startup failed.`n$startupLog" }
+            if (-not (Test-Path (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Bundled core was not discovered' }
+          } finally {
+            if (-not $app.HasExited) { Stop-Process -Id $app.Id; $null = $app.WaitForExit(10000) }
+          }
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: native-startup-diagnostics
+          path: ${{ runner.temp }}/umbra-startup.stderr.log

@@ -1874,9 +1874,11 @@ pub fn run(
     settings: Settings,
     minimized: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    let renderer = crate::graphics::renderer();
+    eprintln!("[umbra] renderer: {renderer}");
     slint::BackendSelector::new()
         .backend_name("winit".into())
-        .renderer_name("femtovg".into())
+        .renderer_name(renderer.into())
         .select()?;
     let ui = MainWindow::new()?;
     // Controlled resource measurements use identical logical geometry. This

@@ -2,6 +2,7 @@ mod commands;
 mod controller;
 mod error;
 mod events;
+mod graphics;
 mod hwid;
 mod instance;
 #[cfg(all(test, windows))]
