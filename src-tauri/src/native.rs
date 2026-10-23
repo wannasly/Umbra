@@ -153,9 +153,12 @@ impl UiState {
     fn show(&self, ui: &MainWindow) {
         let _ = ui.show();
         ui.window().set_minimized(false);
+        ui.window().request_redraw();
         use slint::winit_030::WinitWindowAccessor;
-        ui.window()
-            .with_winit_window(|window| window.focus_window());
+        ui.window().with_winit_window(|window| {
+            window.focus_window();
+            window.request_redraw();
+        });
     }
     fn close(&self, ui: &MainWindow) {
         if self.settings.minimize_to_tray && self.tray.is_some() {
@@ -1881,6 +1884,8 @@ pub fn run(
         .renderer_name(renderer.into())
         .select()?;
     let ui = MainWindow::new()?;
+    ui.global::<Theme>()
+        .set_software_rendering(renderer == "software");
     // Controlled resource measurements use identical logical geometry. This
     // override is accepted only with an explicitly isolated data directory.
     if std::env::var_os("UMBRA_DATA_DIR").is_some() {
@@ -2033,6 +2038,18 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
         return Some(timer);
     }
     let path = std::env::var_os("UMBRA_SMOKE_CAPTURE")?;
+    // Read GPU pixels before buffer presentation. An idle back buffer after a
+    // hide/show cycle can be empty even though the visible frame is complete.
+    let rendered_frame = Rc::new(RefCell::new(None));
+    let frame = rendered_frame.clone();
+    let weak = ui.as_weak();
+    let _ = ui.window().set_rendering_notifier(move |state, _| {
+        if matches!(state, slint::RenderingState::AfterRendering) {
+            if let Some(ui) = weak.upgrade() {
+                *frame.borrow_mut() = ui.window().take_snapshot().ok();
+            }
+        }
+    });
     let page = match std::env::var("UMBRA_SMOKE_PAGE")
         .unwrap_or_default()
         .as_str()
@@ -2120,8 +2137,20 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
                     );
                     eprintln!("LIFECYCLE: second launch restored window");
                 }
-                match ui.window().take_snapshot() {
+                let snapshot = rendered_frame
+                    .borrow_mut()
+                    .take()
+                    .map(Ok)
+                    .unwrap_or_else(|| ui.window().take_snapshot());
+                match snapshot {
                     Ok(image) => {
+                        assert!(
+                            image
+                                .as_bytes()
+                                .chunks_exact(4)
+                                .any(|pixel| { pixel[0] > 4 || pixel[1] > 4 || pixel[2] > 4 }),
+                            "snapshot must contain a rendered interface"
+                        );
                         image::save_buffer(
                             &path,
                             image.as_bytes(),
