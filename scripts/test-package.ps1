@@ -48,8 +48,9 @@ try {
         $smokeProcess = Start-Process -FilePath (Join-Path $installDir 'Umbra.exe') -PassThru -WindowStyle Hidden -RedirectStandardError $stderr
         $null = $smokeProcess.Handle
         Start-Sleep -Seconds 3
-        if ($smokeProcess.HasExited) { throw 'Installed application exited during startup.' }
-        if ((Get-Content -LiteralPath $stderr -Raw) -match '(?m)^Umbra:') { throw 'Installed application reported a startup error.' }
+        $startupLog = Get-Content -LiteralPath $stderr -Raw
+        if ($smokeProcess.HasExited) { throw "Installed application exited during startup.`n$startupLog" }
+        if ($startupLog -match '(?m)^Umbra:') { throw "Installed application reported a startup error.`n$startupLog" }
         if (-not (Test-Path -LiteralPath (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Installed application did not discover its bundled core.' }
     } finally {
         if ($smokeProcess -and -not $smokeProcess.HasExited) { Stop-Process -Id $smokeProcess.Id; $null = $smokeProcess.WaitForExit(10000) }

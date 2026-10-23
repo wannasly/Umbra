@@ -30,6 +30,8 @@ jobs:
           components: rustfmt, clippy
 
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Determine and validate package version
         id: package
@@ -81,9 +83,12 @@ jobs:
         run: ./scripts/test-package.ps1
 
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: Umbra-Windows-x64
-          path: release/*
+          path: |
+            release/*
+            ${{ runner.temp }}/umbra-app-smoke.stderr.log
 
       - name: Publish GitHub release
         if: startsWith(github.ref, 'refs/tags/v') || inputs.publish_release
