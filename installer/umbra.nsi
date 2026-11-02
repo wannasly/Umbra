@@ -2,7 +2,7 @@ Unicode True
 !include "MUI2.nsh"
 !include "x64.nsh"
 !ifndef UMBRA_VERSION
-  !define UMBRA_VERSION "0.3.0"
+  !define UMBRA_VERSION "0.3.1"
 !endif
 Name "Umbra"
 OutFile "${__FILEDIR__}\..\release\Umbra_${UMBRA_VERSION}_x64-setup.exe"

@@ -1,5 +1,5 @@
-import { ListView, ScrollView } from "std-widgets.slint";
-import { Theme, Label, Heading, Caption, Icon, Glass, Badge, Button, Field, Toggle, Choice, EmptyState } from "theme.slint";
+import { ListView, ScrollView } from "scroll.slint";
+import { Theme, Reveal, Label, Heading, Caption, Icon, Glass, Badge, Button, Field, Toggle, Choice, EmptyState } from "theme.slint";
 import { App, ServerRow, SubRow, RouteRow, SettingRow } from "data.slint";
 
 component PageHeader inherits Rectangle {background:transparent;
@@ -22,7 +22,7 @@ component ServerItem inherits Rectangle {background:transparent;
         y:8px; height:root.expanded-header?112px:54px; width:parent.width;
         background:#073b46f2; border-radius:12px; border-width:1px; border-color:Theme.control-border;
         HorizontalLayout {y:0px; x:12px; width:parent.width - 24px; height:54px; spacing:8px;
-            Icon {y:(parent.height - self.height)/2; source:@image-url("icons/chevron.svg"); width:14px; height:14px; transform-rotation:root.item-data.collapsed ? -90deg : 0deg; }
+            Icon {y:(parent.height - self.height)/2; source:@image-url("icons/chevron.svg"); width:14px; height:14px; transform-rotation:root.item-data.collapsed ? -90deg : 0deg; animate transform-rotation { duration:Theme.control; easing:ease-out; } }
             Label {y:(parent.height - self.height)/2; text:root.item-data.name; color:Theme.accent; font-weight:600; letter-spacing:0.7px; }
             Label {y:(parent.height - self.height)/2; text:root.item-data.count; color:Theme.faint; font-size:11px; }
             Rectangle {y:(parent.height - self.height)/2; horizontal-stretch:1; background:transparent; }
@@ -41,7 +41,7 @@ component ServerItem inherits Rectangle {background:transparent;
         Label {x:38px; y:0px; width:parent.width - 52px; height:34px; text:root.item-data.name; color:root.item-data.links.length>0?Theme.accent:Theme.dim; }
         TouchArea {enabled:root.item-data.links.length>0; mouse-cursor:pointer; clicked=> { if root.item-data.links.length==1 { App.action("open-url","",root.item-data.links[0]); } else { notice-popup.show(); } } }
         notice-popup := PopupWindow {x:0px; y:34px; width:min(420px,root.width); height:min(root.item-data.links.length*38px+12px,240px);
-            Glass {background:Theme.raised; border-radius:12px;
+            Glass {x:0px; y:0px; width:100%; height:100%; background:Theme.raised; border-radius:12px;
                 ListView {x:6px; y:6px; width:parent.width - 12px; height:parent.height - 12px; horizontal-scrollbar-policy:always-off;
                     for url in root.item-data.links: FocusScope {height:38px; accessible-role:button; accessible-label:url;
                         accessible-action-default=> { App.action("open-url","",url); notice-popup.close(); }
@@ -81,9 +81,9 @@ component ServerItem inherits Rectangle {background:transparent;
             Label {width:parent.width - self.x; height:self.preferred-height; x:0px; y:0px;  text:root.item-data.ping; color:root.item-data.ping-tone; horizontal-alignment:center; vertical-alignment:center; font-family:"JetBrains Mono"; font-size:11px; }
         }
         Button { x:parent.width - 52px; y:16px; width:36px; ghost:true; tip:App.ru?"Действия с сервером":"Server actions"; icon:@image-url("icons/more.svg"); clicked=> { menu.show(); } }
-        menu := PopupWindow { x:parent.width - 240px; y:56px; width:240px;
-            Glass {background:Theme.raised; border-radius:12px;
-                VerticalLayout {padding:6px; spacing:2px;
+        menu := PopupWindow { x:parent.width - 240px; y:56px; width:240px; height:root.item-data.deletable?124px:86px;
+            Glass {x:0px; y:0px; width:100%; height:100%; background:Theme.raised; border-radius:12px;
+                VerticalLayout {x:0px; y:0px; width:100%; height:100%; padding:6px; spacing:2px;
                     Button {text:App.ru?"Проверить задержку":"Test latency"; ghost:true; icon:@image-url("icons/bolt.svg"); clicked=> { App.action("ping",root.item-data.id,""); menu.close(); } }
                     Button {text:App.ru?"Копировать ссылку":"Copy share link"; ghost:true; icon:@image-url("icons/copy.svg"); clicked=> { App.action("copy-server",root.item-data.id,""); menu.close(); } }
                     if root.item-data.deletable: Button {text:App.ru?"Удалить":"Delete"; ghost:true; danger:true; icon:@image-url("icons/trash.svg"); clicked=> { App.action("delete-server-dialog",root.item-data.id,""); menu.close(); } }
@@ -93,20 +93,20 @@ component ServerItem inherits Rectangle {background:transparent;
     }
 }
 
-export component ServersPage inherits Rectangle {
+export component ServersPage inherits Reveal {
     property<bool> narrow:root.width<650px;
     width:100%; height:100%;x:0px; y:0px; 
     background:transparent;
     PageHeader {x:0px; y:0px; title:App.ru?"Серверы":"Servers"; subtitle:App.server-count; button:root.narrow?"":App.ru?"Добавить":"Add"; add=> { App.action("import-dialog","",""); }
         HorizontalLayout { x:root.narrow?114px:parent.width - 456px; y:root.narrow?8px:0px; width:root.narrow?parent.width - 114px:330px; height:36px; spacing:12px;
-            Choice {y:(parent.height - self.height)/2; options:[App.ru?"По умолчанию":"Default",App.ru?"По задержке":"Latency",App.ru?"По имени":"Name"]; selected:App.sort; chosen(index)=> { App.action("sort","",index==0?"default":index==1?"ping":"name"); } }
-            Button {y:(parent.height - self.height)/2; text:App.ru?"Проверить все":"Test all"; icon:@image-url("icons/bolt.svg"); enabled:!App.busy; clicked=> { App.action("ping","all",""); } }
+            Choice {y:(parent.height - self.height)/2; width:166px; options:[App.ru?"По умолчанию":"Default",App.ru?"По задержке":"Latency",App.ru?"По имени":"Name"]; selected:App.sort; chosen(index)=> { App.action("sort","",index==0?"default":index==1?"ping":"name"); } }
+            Button {y:(parent.height - self.height)/2; width:152px; text:App.ru?"Проверить все":"Test all"; icon:@image-url("icons/bolt.svg"); enabled:!App.busy; clicked=> { App.action("ping","all",""); } }
         }
     }
     if root.narrow: Button {x:0px; y:62px; primary:true; icon:@image-url("icons/plus.svg"); text:App.ru?"Добавить":"Add"; clicked=> { App.action("import-dialog","",""); } }
     Field {x:0px; y:root.narrow?118px:72px; width:parent.width; icon:@image-url("icons/search.svg"); text<=>App.query; placeholder:App.ru?"Поиск по имени или адресу…":"Search name or address…"; }
     ListView {x:0px; y:root.narrow?166px:120px; width:parent.width; height:parent.height - self.y; horizontal-scrollbar-policy:always-off;
-        for row in App.servers: ServerItem { item-data:row; width:parent.width; }
+        for row in App.servers: ServerItem { item-data:row; width:parent.visible-width; }
     }
     if App.servers.length==0: EmptyState {x:0px; y:120px; width:parent.width; height:parent.height - 120px;
         icon:@image-url("icons/serveroff.svg"); title:App.ru?"Нет серверов":"No servers";
@@ -145,12 +145,12 @@ component SubscriptionItem inherits Rectangle {background:transparent;
         Label {height:root.narrow?40px:self.preferred-height; x:16px; y:root.narrow?root.controls-top+(root.item-data.metered?106px:96px):(root.item-data.metered?120px:107px); width:parent.width - 32px; text:root.item-data.quota; wrap:word-wrap; color:Theme.faint; font-size:11px; vertical-alignment:top; }
     }
 }
-export component SubscriptionsPage inherits Rectangle {
+export component SubscriptionsPage inherits Reveal {
     width:100%; height:100%;x:0px; y:0px; 
     background:transparent;
     PageHeader {x:0px; y:0px;  title:App.ru?"Подписки":"Subscriptions"; button:App.ru?"Добавить подписку":"Add subscription"; add=> { App.action("sub-dialog","",""); } }
     ListView {x:0px;  y:56px; width:parent.width; height:parent.height - 56px; horizontal-scrollbar-policy:always-off;
-        for row in App.subscriptions: SubscriptionItem { item-data:row; width:parent.width; }
+        for row in App.subscriptions: SubscriptionItem { item-data:row; width:parent.visible-width; }
     }
     if App.subscriptions.length==0: EmptyState {x:0px; y:56px; width:parent.width; height:parent.height - 56px;
         icon:@image-url("icons/rss.svg"); title:App.ru?"Подписок пока нет":"No subscriptions yet";
@@ -182,8 +182,8 @@ component RoutingItem inherits Rectangle {background:transparent;
         }
     }
 }
-export component RoutingPage inherits Rectangle {
-    property<bool> narrow:root.width<700px;
+export component RoutingPage inherits Reveal {
+    property<bool> narrow:root.width<760px;
     width:100%; height:100%;x:0px; y:0px; 
     background:transparent;
     PageHeader {x:0px; y:0px; title:App.ru?"Маршрутизация":"Routing"; subtitle:App.route-counts[0]+" "+(App.ru?"правил":"rules"); button:App.ru?"Добавить правило":"Add rule"; add=> { App.action("rule-dialog","",""); } }
@@ -191,8 +191,14 @@ export component RoutingPage inherits Rectangle {
         Label {width:parent.width - self.x; height:self.preferred-height;  x:20px; y:20px; text:App.ru?"Остальной трафик":"Other traffic"; font-weight:600; }
         Label {width:root.narrow?parent.width - 40px:parent.width - 288px; height:root.narrow?42px:24px; x:20px; y:root.narrow?40px:40px; wrap:word-wrap; text:App.ru?"Маршрут по умолчанию для соединений без отдельного правила":"Default route for connections without a matching rule"; color:Theme.dim; }
         Rectangle { x:root.narrow?20px:parent.width - 252px; y:root.narrow?88px:17px; width:root.narrow?parent.width - 40px:232px; height:46px; border-radius:12px; border-color:Theme.control-border; border-width:1px; background:#c4dfe609;
+            Rectangle {
+                x:4px + App.route-default*(parent.width - 8px)/2; y:4px;
+                width:(parent.width - 8px)/2; height:parent.height - 8px;
+                border-radius:9px; border-width:1px; border-color:Theme.selected-border; background:Theme.selected;
+                animate x { duration:Theme.reduce-motion ? 0ms : 240ms; easing:cubic-bezier(0.2,0,0,1); }
+            }
             HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
-                for text[index] in [App.ru?"Через прокси":"Proxy",App.ru?"Напрямую":"Direct"]: Rectangle {y:(parent.height - self.height)/2; border-radius:9px; border-width:1px; border-color:App.route-default==index?Theme.selected-border:transparent; background:App.route-default==index?Theme.selected:transparent;
+                for text[index] in [App.ru?"Через прокси":"Proxy",App.ru?"Напрямую":"Direct"]: Rectangle {y:(parent.height - self.height)/2; border-radius:9px; background:transparent;
                     Label {width:parent.width; height:parent.height; x:0px; y:0px; text:text; horizontal-alignment:center; vertical-alignment:center; color:Theme.dim; }
                     TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.action("route-default","",index==0?"proxy":"direct"); } }
                 }
@@ -209,18 +215,26 @@ export component RoutingPage inherits Rectangle {
         Button {x:parent.width - self.width - 12px; y:6px; text:App.ru?"Переподключить":"Reconnect"; enabled:!App.busy; clicked=> { App.action("reconnect","",""); } }
     }
     filters := Rectangle {x:0px; y:warning.y+warning.height+20px+(App.route-dirty?60px:0px); height:root.narrow?94px:46px; width:parent.width; background:transparent;
-        Rectangle {x:0px; y:0px; height:46px; width:root.narrow?root.width:root.width*0.46; border-radius:12px; border-width:1px; border-color:Theme.control-border; background:#c4dfe608;
+        Rectangle {x:0px; y:0px; height:46px; width:root.narrow?root.width:root.width*0.54; border-radius:12px; border-width:1px; border-color:Theme.control-border; background:#c4dfe608;
             HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
-                for text[index] in [App.ru?"Все":"All",App.ru?"Приложения":"Apps",App.ru?"Домены":"Domains","IP"]: Rectangle {y:(parent.height - self.height)/2; background:App.route-filter==index?Theme.selected:transparent; border-color:App.route-filter==index?Theme.selected-border:transparent; border-width:1px; border-radius:9px;
-                    Label {width:parent.width; height:parent.height; x:0px; y:0px; text:text+" ("+App.route-counts[index]+")"; font-size:12px; horizontal-alignment:center; vertical-alignment:center; }
+                for text[index] in [App.ru?"Все":"All",App.ru?"Приложения":"Apps",App.ru?"Домены":"Domains","IP"]: FocusScope {y:(parent.height - self.height)/2;
+                    min-width:tab-label.preferred-width + 20px; horizontal-stretch:1;
+                    accessible-role:button; accessible-label:text;
+                    accessible-action-default => { App.route-filter=index; }
+                    key-pressed(e) => { if e.text==" " || e.text=="\n" { App.route-filter=index; return accept; } return reject; }
+                    Rectangle {width:parent.width; height:parent.height; background:App.route-filter==index?Theme.selected:transparent; border-color:App.route-filter==index?Theme.selected-border:transparent; border-width:1px; border-radius:9px;
+                    animate background,border-color { duration:Theme.reduce-motion?0ms:160ms; easing:ease-out; }
+                    tab-label := Label {width:parent.width; height:parent.height; x:0px; y:0px; text:text+" ("+App.route-counts[index]+")"; font-size:12px; horizontal-alignment:center; vertical-alignment:center; }
                     TouchArea {x:0px; y:0px;  mouse-cursor:pointer; clicked=> { App.route-filter=index; } }
+                    }
+                    if self.has-focus: Rectangle {width:parent.width; height:parent.height; background:transparent; border-width:1px; border-color:Theme.focus; border-radius:9px; }
                 }
             }
         }
-        Field {x:root.narrow?0px:root.width*0.46+12px; y:root.narrow?58px:5px; width:root.narrow?root.width:root.width*0.54 - 12px; icon:@image-url("icons/search.svg"); text<=>App.query; placeholder:App.ru?"Поиск по значению или описанию…":"Search value or description…"; }
+        Field {x:root.narrow?0px:root.width*0.54+12px; y:root.narrow?58px:5px; width:root.narrow?root.width:root.width*0.46 - 12px; icon:@image-url("icons/search.svg"); text<=>App.query; placeholder:App.ru?"Поиск по значению или описанию…":"Search value or description…"; }
     }
     ListView {x:0px; y:filters.y+filters.height+20px; width:parent.width; height:parent.height - self.y; horizontal-scrollbar-policy:always-off;
-        for row in App.routes: RoutingItem { item-data:row; width:parent.width; }
+        for row in App.routes: RoutingItem { item-data:row; width:parent.visible-width; }
     }
 }
 
@@ -265,16 +279,16 @@ component SettingsItem inherits Rectangle {
         }
     }
 }
-export component SettingsPage inherits Rectangle {
+export component SettingsPage inherits Reveal {
     in property<bool> mobile;
     width:100%; height:100%; x:0px; y:0px; background:transparent;
     Heading { x:0px; y:0px; width:parent.width; height:self.preferred-height; text:App.ru?"Настройки":"Settings"; font-size:root.mobile?19.2px:22px; }
     ListView { x:0px; y:44px; width:parent.width; height:parent.height - 44px; horizontal-scrollbar-policy:always-off;
-        for row in App.settings: SettingsItem { item-data:row; mobile:root.mobile; width:parent.width; }
+        for row in App.settings: SettingsItem { item-data:row; mobile:root.mobile; width:parent.visible-width; }
     }
 }
 
-export component LogsPage inherits Rectangle {
+export component LogsPage inherits Reveal {
     width:100%; height:100%;x:0px; y:0px; 
     background:transparent;
     property<bool> narrow:root.width<900px;

@@ -1,5 +1,6 @@
-import { Theme, Label, Heading, Caption, Icon, Glass, Badge, Button } from "theme.slint";
+import { Theme, Reveal, Label, Heading, Caption, Icon, Glass, Badge, Button } from "theme.slint";
 import { App } from "data.slint";
+import { TrafficChart } from "traffic-chart.slint";
 
 component Stat inherits Rectangle {background:transparent;
     in property<string> label;
@@ -16,7 +17,7 @@ component Stat inherits Rectangle {background:transparent;
     Label {width:parent.width - self.x; height:self.preferred-height; x:0px;  y:root.size+34px; text:root.foot; color:Theme.dim; font-size:13px; }
 }
 
-export component Dashboard inherits Rectangle {background:transparent;
+export component Dashboard inherits Reveal {background:transparent;
     in property<length> window-width;
     in property<bool> compact:false;
     property<length> box:root.compact ? 152px : clamp(root.window-width*0.205,192px,248px);
@@ -30,29 +31,62 @@ export component Dashboard inherits Rectangle {background:transparent;
             x:root.stacked?(parent.width - root.box)/2:root.inset; y:root.stacked?14px:root.compact ? 6px : 20px;
             width:root.box; height:parent.height - 2*self.y;
             background:transparent;
+            Image {
+                x:0px; y:0px; width:root.box; height:root.box;
+                source:@image-url("power-glow.svg"); image-fit:contain;
+                opacity:App.status==2 ? 1 : 0;
+                animate opacity { duration:Theme.reduce-motion ? 0ms : 500ms; easing:ease-out; }
+            }
+            // These rings stay inside the button's reserved box, as in Tauri.
+            if App.status==2 && !Theme.reduce-motion && !Theme.software-rendering: Rectangle {
+                x:0px; y:0px; width:root.box; height:root.box; background:transparent;
+                for offset in [0s,1.2s]: Rectangle {
+                    property<float> phase:mod(animation-tick()+offset,2.4s)/2.4s;
+                    width:root.box*0.78; height:self.width;
+                    transform-scale-x:(1 + 0.26*self.phase*(2 - self.phase))*100%;
+                    transform-scale-y:(1 + 0.26*self.phase*(2 - self.phase))*100%;
+                    x:(parent.width - self.width)/2; y:(parent.height - self.height)/2;
+                    border-radius:self.width/2; background:transparent;
+                    border-width:1px; border-color:Theme.ok;
+                    opacity:0.36*(1 - self.phase)*(1 - self.phase);
+                }
+            }
+            if App.status==1 && !Theme.reduce-motion: Image {
+                x:root.box*0.085; y:root.box*0.085; width:root.box*0.83; height:self.width;
+                source:@image-url("connecting-ring.svg"); image-fit:contain;
+                transform-rotation:mod(animation-tick(),1.1s)/1.1s*360deg;
+            }
             power := Rectangle {
-                x:root.box*0.11; y:root.box*0.11;
+                property<float> breath:App.status==2 && !Theme.reduce-motion && !Theme.software-rendering ? 0.01*(1 - cos(animation-tick()/4s*360deg)) : 0;
+                property<float> press-scale:touch.pressed && !Theme.reduce-motion ? 0.96 : 1;
+                x:root.box*0.11; y:root.box*0.11 + (touch.has-hover && !App.busy && !Theme.reduce-motion ? -2px : 0px);
+                animate y { duration:Theme.reduce-motion ? 0ms : 160ms; easing:ease-out; }
                 width:root.box*0.78; height:self.width;
+                transform-scale-x:self.press-scale*(1 + self.breath)*100%;
+                transform-scale-y:self.press-scale*(1 + self.breath)*100%;
+                animate press-scale { duration:Theme.control; easing:ease-out; }
                 border-radius:self.width/2;
-                background:App.status==2 ? #42e58e14 : touch.has-hover ? Theme.selected : Theme.glass;
+                background:touch.pressed ? Theme.selected : App.status==2 ? @linear-gradient(135deg,#0a4a49,#06343e) : touch.has-hover ? Theme.selected : @linear-gradient(135deg,#073b46,#032a34);
                 border-width:1px;
                 border-color:App.status==2 ? #42e58e8c : App.status==1 ? #f2b54480 : #73d5e39e;
-                drop-shadow-offset-y:10px; drop-shadow-blur:30px; drop-shadow-color:#00080b60;
                 animate background,border-color { duration:Theme.reduce-motion ? 0ms : 300ms; }
                 Icon {
                     x:parent.width*0.31; y:parent.height*0.31;
                     width:parent.width*0.38; height:self.width;
                     source:@image-url("icons/power.svg");
                     colorize:App.status==2 ? Theme.ok : App.status==1 ? Theme.warn : Theme.accent;
+                    animate colorize { duration:Theme.reduce-motion ? 0ms : 500ms; }
                 }
-                FocusScope {x:0px; y:0px; 
+                power-keyboard := FocusScope {x:0px; y:0px; width:100%; height:100%; enabled:!App.busy;
+                    accessible-action-default => { if !App.busy { App.action("toggle","",""); } }
+                    if self.has-focus: Rectangle { x:-4px; y:-4px; width:parent.width+8px; height:parent.height+8px; border-radius:self.width/2; border-color:Theme.focus; border-width:2px; background:transparent; }
                     accessible-role:button;
                     accessible-label:App.status==2 ? (App.ru?"Отключить":"Disconnect") : (App.ru?"Подключить":"Connect");
                     key-pressed(e)=> { if e.text==" " || e.text=="\n" { App.action("toggle","",""); return accept; } return reject; }
-                    touch := TouchArea {x:0px; y:0px;  enabled:!App.busy; mouse-cursor:pointer; clicked=> { App.action("toggle","",""); } }
+                    touch := TouchArea {x:0px; y:0px;  enabled:!App.busy; mouse-cursor:pointer; clicked=> { power-keyboard.focus(); App.action("toggle","",""); } }
                 }
             }
-            Heading {x:0px;  y:root.box + (root.compact? -4px : 3px); width:parent.width; height:32px; text:App.status-text; horizontal-alignment:center; font-size:root.compact?16px:clamp(root.window-width*0.0185,20px,26px); letter-spacing:2px; color:App.status==2 ? Theme.ok : App.status==1 ? Theme.warn : Theme.dim; }
+            Heading {x:0px;  y:root.box + (root.compact? -4px : 3px); width:parent.width; height:32px; text:App.status-text; horizontal-alignment:center; font-size:root.compact?16px:clamp(root.window-width*0.0185,20px,26px); letter-spacing:0.5px; color:App.status==2 ? Theme.ok : App.status==1 ? Theme.warn : Theme.dim; }
         }
         details := Rectangle {
             x:root.stacked ? root.inset : power-col.x+power-col.width+24px;
@@ -102,9 +136,14 @@ export component Dashboard inherits Rectangle {background:transparent;
             spacing:16px;
             Caption {y:(parent.height - self.height)/2; text:App.ru?"РЕЖИМ":"MODE"; vertical-alignment:center; }
             Rectangle {y:(parent.height - self.height)/2;      width:274px; background:#c4dfe60a; border-width:1px; border-color:Theme.control-border; border-radius:12px;
+                Rectangle {
+                    x:4px + App.mode*(parent.width - 8px)/2; y:4px;
+                    width:(parent.width - 8px)/2; height:parent.height - 8px;
+                    background:#c4dfe61f; border-radius:9px; border-color:Theme.control-border; border-width:1px;
+                    animate x { duration:Theme.reduce-motion ? 0ms : 240ms; easing:cubic-bezier(0.2,0,0,1); }
+                }
                 HorizontalLayout {x:0px; y:0px;  padding:4px; spacing:0px;
-                    for item[index] in [App.ru?"Системный прокси":"System proxy",App.ru?"Режим TUN":"TUN mode"]: Rectangle {y:(parent.height - self.height)/2;              background:App.mode==index ? #c4dfe61f : transparent;
-                        border-radius:9px; border-color:App.mode==index ? Theme.control-border : transparent; border-width:1px;
+                    for item[index] in [App.ru?"Системный прокси":"System proxy",App.ru?"Режим TUN":"TUN mode"]: Rectangle {y:(parent.height - self.height)/2; background:transparent;
                         Label {width:parent.width; height:parent.height; x:0px; y:0px; text:item; horizontal-alignment:center; vertical-alignment:center; font-size:13px; font-weight:600; color:App.mode==index ? Theme.text : Theme.dim; }
                         TouchArea {x:0px; y:0px;  enabled:!App.busy && App.status==0; mouse-cursor:pointer; clicked=> { App.action("mode","",index==0?"system_proxy":"tun"); } }
                     }
@@ -135,8 +174,16 @@ export component Dashboard inherits Rectangle {background:transparent;
         chart-box := Rectangle {
             x:root.inset; y:parent.height - 122px; width:parent.width - 2*root.inset; height:104px; background:transparent; clip:true; border-radius:12px;
             for f in [0.28,0.52,0.76]: Rectangle {x:0px;  y:parent.height*f; height:1px; width:parent.width; background:Theme.border; }
-            if App.traffic-idle: Image {x:0px; y:0px;  width:parent.width; height:parent.height; source:@image-url("tide.svg"); image-fit:fill; }
-            if !App.traffic-idle: Image {x:0px; y:0px;  width:parent.width; height:parent.height; source:App.chart; image-fit:fill; }
+            if App.traffic-idle: Rectangle {
+                width:parent.width; height:parent.height; background:transparent; clip:true;
+                for offset in [0,1]: Image {
+                    x:Theme.reduce-motion || Theme.software-rendering ? 0px : (offset - mod(animation-tick(),19s)/19s)*parent.width;
+                    width:parent.width; height:parent.height;
+                    source:@image-url("tide.svg"); image-fit:fill;
+                    opacity:Theme.reduce-motion || Theme.software-rendering ? (offset==0 ? 1 : 0) : 1;
+                }
+            }
+            if !App.traffic-idle: TrafficChart { width:100%; height:100%; }
             if App.traffic-idle: Caption {height:self.preferred-height; x:0px;  y:parent.height*0.26; width:parent.width; text:App.status==2 ? (App.ru?"ОЖИДАНИЕ ТРАФИКА":"WAITING FOR TRAFFIC") : (App.ru?"СОЕДИНЕНИЕ НЕ УСТАНОВЛЕНО":"NOT CONNECTED"); horizontal-alignment:center; }
         }
     }

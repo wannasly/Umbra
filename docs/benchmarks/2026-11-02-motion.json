@@ -1,0 +1,38 @@
+{
+  "date": "2026-11-02",
+  "build": "release",
+  "size_logical": [
+    1240,
+    800
+  ],
+  "scale": 1.25,
+  "duration_seconds": 8,
+  "warmup_seconds": 2,
+  "measurement": "AfterRendering intervals while animations were active; synthetic local fixtures; no GPU readback",
+  "scenes": {
+    "dashboard": {
+      "build": "release",
+      "fps": 306.53367783340514,
+      "frames": 1839,
+      "median_ms": 3.1159999999999997,
+      "over_25ms": 0,
+      "p95_ms": 4.4869,
+      "p99_ms": 5.1577,
+      "scene": "dashboard"
+    },
+    "pages": {
+      "build": "release",
+      "fps": 298.61136589747474,
+      "frames": 949,
+      "median_ms": 3.3472,
+      "over_25ms": 2,
+      "p95_ms": 4.4966,
+      "p99_ms": 8.9272,
+      "scene": "pages"
+    }
+  },
+  "manual_checks": {
+    "scrollbar_drag": "passed",
+    "window_edge_resize_after_windows_style_fix": "not verified: user stopped Computer Use with Escape"
+  }
+}
