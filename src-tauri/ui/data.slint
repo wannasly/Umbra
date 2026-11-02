@@ -29,6 +29,9 @@ export global App {
     in-out property<string> session-up:"0 Б";
     in-out property<string> uptime:"—";
     in-out property<image> chart;
+    in-out property<int> chart-request;
+    in-out property<string> chart-peak;
+    in-out property<int> chart-revision;
     in-out property<bool> traffic-idle:true;
     in-out property<string> server-count;
     in-out property<[ServerRow]> servers;

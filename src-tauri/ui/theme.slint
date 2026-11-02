@@ -4,6 +4,10 @@ export global Theme {
     in-out property<color> accent2: #a0e8f0;
     in-out property<bool> reduce-motion: false;
     in-out property<bool> software-rendering: false;
+    // Match the old Motion page enter/exit and control timings.
+    out property<duration> enter: reduce-motion ? 0ms : 180ms;
+    out property<duration> leave: reduce-motion ? 0ms : 120ms;
+    out property<duration> control: reduce-motion ? 0ms : 160ms;
     out property<color> deep: #00151d;
     out property<color> panel: #042e38;
     out property<color> raised: #073b46;
@@ -22,11 +26,46 @@ export global Theme {
     out property<color> danger: #ff738f;
 }
 
+// A one-shot reveal: no timer or continuous frames once the view settles.
+export component Reveal inherits Rectangle {
+    out property<float> entrance: 0;
+    init => { root.entrance = 1; }
+    opacity: Theme.reduce-motion ? 1 : root.entrance;
+    animate entrance { duration:Theme.enter; easing:cubic-bezier(0.2,0,0,1); }
+}
+
+// Window chrome uses its own compact focus treatment. Pointer clicks must not
+// leave an oversized focus ring hanging outside the title bar.
+export component WindowButton inherits FocusScope {
+    in property<image> icon;
+    in property<string> tip;
+    in property<bool> close-button:false;
+    callback clicked;
+    width:44px; height:36px;
+    accessible-role:button;
+    accessible-label:root.tip;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    key-pressed(e) => {
+        if (e.text==" " || e.text=="\n") && root.enabled { root.clicked(); return accept; }
+        return reject;
+    }
+    Rectangle {
+        x:2px; y:2px; width:parent.width - 4px; height:parent.height - 4px;
+        border-radius:8px;
+        background:touch.pressed ? (root.close-button ? #b33650 : Theme.selected) : touch.has-hover ? (root.close-button ? #b33650 : Theme.hover) : transparent;
+        border-width:root.has-focus ? 1px : 0px;
+        border-color:Theme.focus;
+        animate background { duration:Theme.reduce-motion ? 0ms : 120ms; easing:ease-out; }
+        Image {width:16px; height:16px; image-fit:contain; x:(parent.width - self.width)/2; y:(parent.height - self.height)/2; source:root.icon; colorize:touch.has-hover && root.close-button ? Theme.text : Theme.dim; }
+    }
+    touch := TouchArea {enabled:root.enabled; mouse-cursor:pointer; clicked => { root.clicked(); } }
+}
+
 export component Label inherits Text {
     color: Theme.text;
     font-family: "Inter";
     font-size: 13px;
-    font-weight: 400;
+    font-weight: 500;
     overflow: elide;
     vertical-alignment:center;
 }
@@ -37,7 +76,7 @@ export component Heading inherits Label {font-family: "Manrope";
 export component Caption inherits Label {color: Theme.faint;
     font-size: 12px;
     font-weight: 600;
-    letter-spacing: 1.1px;
+    letter-spacing: 0.6px;
 }
 export component Icon inherits Image {width: 16px;
     height: 16px;
@@ -82,12 +121,13 @@ export component Button inherits FocusScope {in property<string> text;
         if (event.text == " " || event.text == "\n") && root.enabled { root.clicked(); return accept; }
         return reject;
     }
-    Rectangle {x:0px; y:0px; width:100%; height:100%;
+    Rectangle {x:0px; y:touch.pressed && root.enabled ? 1px : 0px; width:100%; height:100%;
+        animate y { duration: Theme.reduce-motion ? 0ms : 100ms; easing: ease-out; }
         background: root.primary ? (Theme.software-rendering ? Theme.accent : @linear-gradient(135deg, Theme.accent, Theme.accent2)) : root.danger ? (touch.has-hover ? #ff738f33 : #ff738f19) : touch.has-hover ? Theme.hover : root.ghost ? transparent : #073b468c;
         border-width: root.primary || root.ghost ? 0px : 1px;
         border-color: root.danger ? #ff738f4d : touch.has-hover ? Theme.selected-border : Theme.control-border;
         border-radius: 12px;
-        animate background, border-color { duration: Theme.reduce-motion ? 0ms : 150ms; }
+        animate background, border-color { duration: Theme.reduce-motion ? 0ms : 150ms; easing: ease-out; }
         if root.has-focus: Rectangle { x:-3px; y:-3px; width:parent.width+6px; height:parent.height+6px; border-radius:14px; border-width:2px; border-color:Theme.focus; background:transparent; }
         content := HorizontalLayout {x:0px; y:0px; width:100%; height:100%; 
             alignment: center; spacing:8px; padding-left:10px; padding-right:10px;
@@ -111,13 +151,14 @@ export component Field inherits Rectangle {in-out property<string> text;
     background: #073b468c;
     border-radius:12px;
     border-color:input.has-focus ? Theme.focus : Theme.control-border;
+    animate border-color { duration:Theme.control; easing:ease-out; }
     border-width:1px;
     if root.icon.width>0: Icon {x:12px; y:11px; width:14px; height:14px; source:root.icon; colorize:Theme.faint; }
     input := TextInput {
         x:root.icon.width>0?36px:12px; y:8px; width:parent.width - self.x - 12px; height:parent.height - 16px;
         text <=> root.text;
         color:Theme.text;
-        font-family:"Inter"; font-size:13px;
+        font-family:"Inter"; font-size:13px; font-weight:500;
         single-line:!root.multiline;
         wrap:root.multiline ? word-wrap : no-wrap;
         input-type:root.secret ? InputType.password : InputType.text;
@@ -144,9 +185,10 @@ export component Toggle inherits FocusScope {in property<bool> checked;
         border-radius:11px;
         border-width:1px; border-color:root.checked ? transparent : Theme.control-border;
         background:root.checked ? (Theme.software-rendering ? Theme.accent : @linear-gradient(90deg,Theme.accent,Theme.accent2)) : Theme.raised;
+        animate background, border-color { duration:Theme.control; easing:ease-out; }
         Rectangle {
             x:root.checked ? 21px : 3px; y:3px; width:16px; height:16px; border-radius:8px; background:white;
-            animate x { duration:Theme.reduce-motion ? 0ms : 150ms; easing:ease-out; }
+            animate x { duration:Theme.reduce-motion ? 0ms : 220ms; easing:cubic-bezier(0.2,0,0,1); }
         }
     }
     TouchArea {x:0px; y:0px;  enabled:root.enabled; mouse-cursor:pointer; clicked=> { root.focus(); root.toggled(!root.checked); } }
@@ -175,11 +217,12 @@ export component Choice inherits Rectangle {in property<[string]> options;
     touch := TouchArea {x:0px; y:0px;  enabled:root.enabled; mouse-cursor:pointer; clicked=> { keyboard.focus(); popup.show(); } }
     popup := PopupWindow {
         x:0px; y:root.height+4px; width:root.width;
-        Rectangle {x:0px; y:0px; 
+        height:10px + root.options.length*36px + max(0,root.options.length - 1)*2px;
+        Rectangle {x:0px; y:0px; width:100%; height:100%;
             background:Theme.raised; border-width:1px; border-color:Theme.control-border; border-radius:12px;
-            VerticalLayout {x:0px; y:0px; 
+            VerticalLayout {x:0px; y:0px; width:100%; height:100%;
                 padding:5px; spacing:2px;
-                for item[index] in root.options: Button {text:item; ghost:true; clicked=> { root.chosen(index); popup.close(); } }
+                for item[index] in root.options: Button {width:popup.width - 10px; text:item; ghost:true; clicked=> { root.chosen(index); popup.close(); } }
             }
         }
     }

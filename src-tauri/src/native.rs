@@ -23,6 +23,10 @@ use std::{
 
 slint::include_modules!();
 
+#[cfg(feature = "smoke-test")]
+#[path = "native_bench.rs"]
+mod motion_bench;
+
 thread_local! { static UI: RefCell<Option<UiState>> = const { RefCell::new(None) }; }
 
 fn tr(ru: bool, a: &str, b: &str) -> SharedString {
@@ -99,6 +103,36 @@ fn kind_labels(node: &ProxyKind) -> (&'static str, String, String) {
     }
 }
 
+struct ChartRequest {
+    svg: String,
+    id: i32,
+    peak: String,
+    ui: slint::Weak<MainWindow>,
+}
+
+fn chart_worker() -> mpsc::Sender<ChartRequest> {
+    let (sender, receiver) = mpsc::channel::<ChartRequest>();
+    std::thread::spawn(move || {
+        while let Ok(mut request) = receiver.recv() {
+            // Bursts of backend events only need the most recent curve.
+            while let Ok(newer) = receiver.try_recv() {
+                request = newer;
+            }
+            if let Some(pixels) = crate::chart::rasterize(&request.svg) {
+                let _ = request.ui.upgrade_in_event_loop(move |ui| {
+                    let data = ui.global::<App>();
+                    if data.get_chart_request() == request.id && !data.get_traffic_idle() {
+                        data.set_chart(slint::Image::from_rgba8_premultiplied(pixels));
+                        data.set_chart_peak(request.peak.into());
+                        data.set_chart_revision(request.id);
+                    }
+                });
+            }
+        }
+    });
+    sender
+}
+
 struct UiState {
     app: AppHandle,
     settings: Settings,
@@ -111,6 +145,8 @@ struct UiState {
     models_dirty: bool,
     traffic: [f64; 4],
     history: VecDeque<[f64; 2]>,
+    chart_peak: std::cell::Cell<f64>,
+    chart_sender: RefCell<Option<mpsc::Sender<ChartRequest>>>,
     logs_revision: u64,
     log_level: String,
     flags: HashMap<String, slint::Image>,
@@ -135,6 +171,8 @@ impl UiState {
             models_dirty: true,
             traffic: [0.0; 4],
             history: VecDeque::new(),
+            chart_peak: std::cell::Cell::new(1.0),
+            chart_sender: RefCell::new(None),
             logs_revision: u64::MAX,
             log_level: String::new(),
             flags: HashMap::new(),
@@ -257,6 +295,11 @@ impl UiState {
                     self.message(ui, error, true);
                 }
             }
+            if conn.status == ConnStatus::Connected && conn.since_ms != self.conn.since_ms {
+                self.history.clear();
+                self.chart_peak.set(1.0);
+                data.set_traffic_idle(true);
+            }
             if conn.status == ConnStatus::Connected
                 && (conn.since_ms != self.conn.since_ms || self.applied_routes.is_none())
             {
@@ -354,13 +397,26 @@ impl UiState {
         } else {
             0
         });
-        data.set_status(match self.conn.status {
+        let display_status = self.conn.status;
+        // Visual fixtures never start a core or change network settings.
+        #[cfg(feature = "smoke-test")]
+        let display_status = if std::env::var_os("UMBRA_SMOKE_CAPTURE").is_some() {
+            match std::env::var("UMBRA_SMOKE_STATUS").as_deref() {
+                Ok("connecting") => ConnStatus::Connecting,
+                Ok("connected") => ConnStatus::Connected,
+                Ok("disconnected") => ConnStatus::Disconnected,
+                _ => display_status,
+            }
+        } else {
+            display_status
+        };
+        data.set_status(match display_status {
             ConnStatus::Disconnected => 0,
             ConnStatus::Connecting => 1,
             ConnStatus::Connected => 2,
             ConnStatus::Stopping => 3,
         });
-        data.set_status_text(match self.conn.status {
+        data.set_status_text(match display_status {
             ConnStatus::Disconnected => tr(ru, "Отключено", "Disconnected"),
             ConnStatus::Connecting => tr(ru, "Подключение…", "Connecting…"),
             ConnStatus::Connected => tr(ru, "Подключено", "Connected"),
@@ -498,43 +554,37 @@ impl UiState {
         ui.global::<App>().set_uptime(text(value));
     }
     fn update_chart(&self, ui: &MainWindow) {
-        let idle = self.history.iter().all(|s| s[0] == 0.0 && s[1] == 0.0);
-        ui.global::<App>().set_traffic_idle(idle);
-        if idle {
+        let chart = crate::chart::curves(&self.history, self.chart_peak.get());
+        self.chart_peak.set(chart.peak);
+        let data = ui.global::<App>();
+        let id = data.get_chart_request().wrapping_add(1);
+        data.set_chart_request(id);
+        data.set_traffic_idle(chart.idle);
+        if chart.idle {
             return;
         }
-        let peak = self
-            .history
-            .iter()
-            .flatten()
-            .copied()
-            .fold(1.0_f64, f64::max);
-        let mut svg=String::from("<svg xmlns='http://www.w3.org/2000/svg' width='944' height='104' viewBox='0 0 944 104'>");
-        for (i, tint, alpha) in [(1, "#a0e8f0", 0.25), (0, "#73d5e3", 0.15)] {
-            let points: Vec<_> = self
-                .history
-                .iter()
-                .enumerate()
-                .map(|(n, p)| {
-                    (
-                        n as f64 * 944.0 / 60.0,
-                        104.0 - (p[i] / peak).min(1.0).sqrt() * 94.0,
-                    )
-                })
-                .collect();
-            if let Some(&(x, y)) = points.first() {
-                let mut path = format!("M{x:.2} {y:.2}");
-                for p in points.windows(2) {
-                    path += &format!(" L{:.2} {:.2}", p[1].0, p[1].1);
-                }
-                let last = points.last().unwrap().0;
-                svg+=&format!("<path d='{path} L{last:.2} 104 L0 104Z' fill='{tint}' opacity='{alpha}'/><path d='{path}' fill='none' stroke='{tint}' stroke-width='2'/>");
-            }
-        }
-        svg += "</svg>";
-        if let Ok(image) = slint::Image::load_from_svg_data(svg.as_bytes()) {
-            ui.global::<App>().set_chart(image);
-        }
+        let tint = |color: slint::Color| {
+            format!(
+                "#{:02x}{:02x}{:02x}",
+                color.red(),
+                color.green(),
+                color.blue()
+            )
+        };
+        let svg = crate::chart::svg(
+            &chart,
+            ui.window().scale_factor(),
+            &tint(ui.global::<Theme>().get_accent2()),
+            &tint(ui.global::<Theme>().get_accent()),
+        );
+        let mut sender = self.chart_sender.borrow_mut();
+        let sender = sender.get_or_insert_with(chart_worker);
+        let _ = sender.send(ChartRequest {
+            svg,
+            id,
+            ui: ui.as_weak(),
+            peak: format_bytes(chart.peak, self.settings.language == "ru", true),
+        });
     }
 
     fn update_logs(&mut self, ui: &MainWindow) {
@@ -1255,6 +1305,7 @@ impl UiState {
                 self.update_logs(ui);
             }
             "window-close" => self.close(ui),
+            "chart-refresh" => self.update_chart(ui),
             "window-minimize" => ui.window().set_minimized(true),
             "window-maximize" => ui.window().set_maximized(!ui.window().is_maximized()),
             "window-drag" => {
@@ -1911,6 +1962,16 @@ pub fn run(
     UI.with(|state| *state.borrow_mut() = Some(UiState::new(app.clone(), settings, tray)));
     let weak = ui.as_weak();
     ui.global::<App>().on_action(move |action, id, value| {
+        // Native drag must begin during the original pointer press.
+        if action.as_str() == "window-drag" {
+            if let Some(ui) = weak.upgrade() {
+                use slint::winit_030::WinitWindowAccessor;
+                ui.window().with_winit_window(|window| {
+                    let _ = window.drag_window();
+                });
+            }
+            return;
+        }
         let weak = weak.clone();
         let action = action.to_string();
         let id = id.to_string();
@@ -1973,6 +2034,27 @@ pub fn run(
         slint::CloseRequestResponse::KeepWindowShown
     });
     ui.show()?;
+    crate::graphics::enable_native_resize(ui.window());
+    {
+        use slint::winit_030::{winit::event::WindowEvent, EventResult, WinitWindowAccessor};
+        ui.window().on_winit_window_event(|window, event| {
+            if matches!(
+                event,
+                WindowEvent::Resized(_)
+                    | WindowEvent::ScaleFactorChanged { .. }
+                    | WindowEvent::Focused(true)
+            ) {
+                crate::graphics::enable_native_resize(window);
+            }
+            EventResult::Propagate
+        });
+    }
+    let controlled_size = std::env::var_os("UMBRA_DATA_DIR").is_some()
+        && (std::env::var_os("UMBRA_BENCH_SIZE").is_some()
+            || std::env::var_os("UMBRA_SMOKE_CAPTURE").is_some());
+    if !controlled_size {
+        crate::graphics::fit_startup_window(ui.window());
+    }
     UI.with(|state| {
         if let Some(state) = state.borrow_mut().as_mut() {
             state.refresh(&ui);
@@ -2016,7 +2098,7 @@ pub fn run(
 }
 
 #[cfg(feature = "smoke-test")]
-fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
+fn setup_capture(ui: &MainWindow) -> Option<Vec<slint::Timer>> {
     if let Ok(size) = std::env::var("UMBRA_BENCH_SIZE") {
         assert!(
             std::env::var_os("UMBRA_DATA_DIR").is_some(),
@@ -2027,6 +2109,10 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
             ui.window()
                 .set_size(slint::LogicalSize::new(dimensions[0], dimensions[1]));
         }
+        if std::env::var_os("UMBRA_BENCH_SCENE").is_some() {
+            return Some(motion_bench::start(ui));
+        }
+        // Preserve the long, unmodified session used by resource measurements.
         let timer = slint::Timer::default();
         timer.start(
             slint::TimerMode::SingleShot,
@@ -2035,7 +2121,7 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
                 let _ = slint::quit_event_loop();
             },
         );
-        return Some(timer);
+        return Some(vec![timer]);
     }
     let path = std::env::var_os("UMBRA_SMOKE_CAPTURE")?;
     // Read GPU pixels before buffer presentation. An idle back buffer after a
@@ -2062,6 +2148,27 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
         _ => 0,
     };
     ui.global::<App>().set_page(page);
+    if std::env::var_os("UMBRA_SMOKE_TRAFFIC").is_some() {
+        motion_bench::seed_chart(ui);
+    }
+    if std::env::var_os("UMBRA_SMOKE_SCROLL").is_some() {
+        let weak = ui.as_weak();
+        slint::Timer::single_shot(Duration::from_millis(650), move || {
+            if let Some(ui) = weak.upgrade() {
+                let size = ui.window().size();
+                let scale = ui.window().scale_factor();
+                ui.window()
+                    .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                        position: slint::LogicalPosition::new(
+                            size.width as f32 / scale * 0.75,
+                            size.height as f32 / scale * 0.65,
+                        ),
+                        delta_x: 0.0,
+                        delta_y: -400.0,
+                    });
+            }
+        });
+    }
     if let Ok(action) = std::env::var("UMBRA_SMOKE_ACTION") {
         UI.with(|state| {
             if let Some(state) = state.borrow_mut().as_mut() {
@@ -2166,7 +2273,7 @@ fn setup_capture(ui: &MainWindow) -> Option<slint::Timer> {
             }
         },
     );
-    Some(timer)
+    Some(vec![timer])
 }
 
 #[cfg(test)]
@@ -2275,6 +2382,230 @@ mod tests {
         state.app.state().conn.write().await.since_ms = Some(2000);
         state.refresh(&ui);
         assert!(!ui.global::<App>().get_route_dirty());
+    }
+
+    #[test]
+    fn transitions_keep_latest_destination_and_allow_reopening_a_closing_dialog() {
+        let (_dir, _state, ui) = fixture();
+        let data = ui.global::<App>();
+        let advance = |ms| {
+            i_slint_backend_testing::mock_elapsed_time(Duration::from_millis(ms));
+            slint::platform::update_timers_and_animations();
+        };
+        ui.global::<Theme>().set_reduce_motion(false);
+        data.set_page(1);
+        advance(1);
+        assert_eq!(ui.get_displayed_page(), 0, "keep the outgoing page mounted");
+        advance(60);
+        data.set_page(5);
+        advance(1);
+        advance(130);
+        assert_eq!(ui.get_displayed_page(), 5, "latest click wins");
+        advance(200);
+
+        data.set_modal(5);
+        advance(1);
+        assert_eq!(ui.get_displayed_modal(), 5);
+        data.set_modal(0);
+        advance(1);
+        assert_eq!(ui.get_displayed_modal(), 5, "retain dialog during fade out");
+        advance(60);
+        data.set_modal(2);
+        advance(1);
+        advance(200);
+        assert_eq!(
+            ui.get_displayed_modal(),
+            2,
+            "old close must not dismiss new dialog"
+        );
+        data.set_modal(0);
+        advance(1);
+        advance(130);
+        assert_eq!(ui.get_displayed_modal(), 0);
+
+        ui.global::<Theme>().set_reduce_motion(true);
+        data.set_page(3);
+        data.set_modal(5);
+        advance(1);
+        assert_eq!(ui.get_displayed_page(), 3);
+        assert_eq!(ui.get_displayed_modal(), 5);
+        data.set_modal(0);
+        advance(1);
+        assert_eq!(
+            ui.get_displayed_modal(),
+            0,
+            "reduced motion closes immediately"
+        );
+    }
+
+    #[test]
+    fn custom_scrollbar_preserves_wheel_scrolling_and_clamps_accessible_input() {
+        let (_dir, _state, ui) = fixture();
+        ui.window().set_size(slint::LogicalSize::new(1100.0, 720.0));
+        ui.global::<Theme>().set_reduce_motion(true);
+        ui.global::<App>().set_page(1);
+        i_slint_backend_testing::mock_elapsed_time(Duration::from_millis(1));
+        slint::platform::update_timers_and_animations();
+        let scrollbar =
+            i_slint_backend_testing::ElementHandle::find_by_accessible_label(&ui, "Прокрутка")
+                .find(|element| element.accessible_value_maximum().unwrap_or(0.0) > 0.0)
+                .expect("scrollable server list");
+        let value = || {
+            scrollbar
+                .accessible_value()
+                .unwrap()
+                .parse::<f32>()
+                .unwrap()
+        };
+        scrollbar.set_accessible_value("-999");
+        assert_eq!(value(), 0.0);
+        let position = scrollbar.absolute_position();
+        ui.window()
+            .dispatch_event(slint::platform::WindowEvent::PointerScrolled {
+                position: slint::LogicalPosition::new(position.x - 24.0, position.y + 100.0),
+                delta_x: 0.0,
+                delta_y: -120.0,
+            });
+        assert!(
+            value() > 0.0,
+            "wheel must scroll the underlying virtual list"
+        );
+        scrollbar.set_accessible_value("1000000");
+        assert!(value() <= scrollbar.accessible_value_maximum().unwrap());
+        scrollbar.set_accessible_value("0");
+        assert_eq!(value(), 0.0);
+    }
+
+    #[tokio::test]
+    async fn dropdown_options_have_hit_areas_and_dispatch_selection_on_pointer_click() {
+        use i_slint_backend_testing::ElementHandle;
+        use slint::platform::{PointerEventButton, WindowEvent};
+
+        let (_dir, mut state, ui) = fixture();
+        ui.window()
+            .set_size(slint::LogicalSize::new(1240.0, 1800.0));
+        ui.global::<Theme>().set_reduce_motion(true);
+        let actions = Rc::new(RefCell::new(Vec::new()));
+        let received = actions.clone();
+        ui.global::<App>().on_action(move |action, id, value| {
+            received
+                .borrow_mut()
+                .push((action.to_string(), id.to_string(), value.to_string()));
+        });
+        let click = |position| {
+            ui.window()
+                .dispatch_event(WindowEvent::PointerMoved { position });
+            ui.window().dispatch_event(WindowEvent::PointerPressed {
+                position,
+                button: PointerEventButton::Left,
+            });
+            ui.window().dispatch_event(WindowEvent::PointerReleased {
+                position,
+                button: PointerEventButton::Left,
+            });
+        };
+        for (page, selected, option, action, value) in [
+            (1, "По умолчанию", "По имени", "sort", "name"),
+            (2, "12 ч", "48 ч", "auto-update", "48"),
+            (3, "Через прокси", "Блокировать", "rule-action", "block"),
+            (
+                5,
+                "Только IPv4 (рекомендуется)",
+                "Предпочитать IPv6",
+                "setting-choice",
+                "2",
+            ),
+        ] {
+            ui.global::<Theme>().set_reduce_motion(true);
+            ui.global::<App>().set_page(page);
+            i_slint_backend_testing::mock_elapsed_time(Duration::from_millis(1));
+            slint::platform::update_timers_and_animations();
+            let combo = ElementHandle::find_by_accessible_label(&ui, selected)
+                .find(|e| e.size().height == 36.0)
+                .unwrap_or_else(|| panic!("dropdown {selected}"));
+            let origin = combo.absolute_position();
+            click(slint::LogicalPosition::new(
+                origin.x + 10.0,
+                origin.y + 18.0,
+            ));
+            let item = ElementHandle::find_by_accessible_label(&ui, option)
+                .find(|e| e.size().height == 36.0)
+                .unwrap_or_else(|| panic!("option {option}"));
+            assert!(
+                item.size().width >= combo.size().width - 10.0,
+                "whole option must be clickable"
+            );
+            let position = item.absolute_position();
+            let popup_anchor =
+                slint::private_unstable_api::re_exports::WindowInner::from_pub(ui.window())
+                    .active_popups()
+                    .last()
+                    .unwrap()
+                    .parent_item
+                    .upgrade()
+                    .unwrap();
+            let popup_origin = popup_anchor.map_to_window(popup_anchor.geometry().origin);
+            actions.borrow_mut().clear();
+            // Popup element positions are local to its separate item tree.
+            click(slint::LogicalPosition::new(
+                popup_origin.x + position.x + item.size().width - 8.0,
+                popup_origin.y + 40.0 + position.y + 18.0,
+            ));
+            let (actual_action, id, actual_value) = actions
+                .borrow_mut()
+                .pop()
+                .unwrap_or_else(|| panic!("pointer selection dispatches {option}"));
+            assert_eq!(
+                (actual_action.as_str(), actual_value.as_str()),
+                (action, value),
+                "{option}"
+            );
+            assert!(
+                ElementHandle::find_by_accessible_label(&ui, option)
+                    .next()
+                    .is_none(),
+                "selection closes the popup"
+            );
+            state
+                .action(&ui, &actual_action, &id, &actual_value)
+                .unwrap();
+            finish(&mut state, &ui).await;
+            assert!(
+                ElementHandle::find_by_accessible_label(&ui, option)
+                    .next()
+                    .is_some(),
+                "{option} must be reflected after the backend saves the selection"
+            );
+        }
+
+        ui.global::<Theme>().set_reduce_motion(true);
+        ui.global::<App>().set_page(1);
+        i_slint_backend_testing::mock_elapsed_time(Duration::from_millis(1));
+        slint::platform::update_timers_and_animations();
+        let menu = ElementHandle::find_by_accessible_label(&ui, "Действия с сервером")
+            .next()
+            .unwrap();
+        let origin = menu.absolute_position();
+        click(slint::LogicalPosition::new(
+            origin.x + 18.0,
+            origin.y + 18.0,
+        ));
+        let copy = ElementHandle::find_by_accessible_label(&ui, "Копировать ссылку")
+            .next()
+            .unwrap();
+        assert!(copy.size().width > 0.0 && copy.size().height == 36.0);
+        let position = copy.absolute_position();
+        actions.borrow_mut().clear();
+        click(slint::LogicalPosition::new(
+            origin.x - 188.0 + position.x + 18.0,
+            origin.y + 40.0 + position.y + 18.0,
+        ));
+        assert_eq!(actions.borrow().last().unwrap().0, "copy-server");
+        assert!(
+            ElementHandle::find_by_accessible_label(&ui, "Копировать ссылку")
+                .next()
+                .is_none()
+        );
     }
 
     fn fixture() -> (tempfile::TempDir, UiState, MainWindow) {

@@ -1,0 +1,100 @@
+import { Theme } from "theme.slint";
+import { App } from "data.slint";
+
+component ScrollThumb inherits FocusScope {
+    in property<length> maximum;
+    in property<length> page-size;
+    in-out property<length> value;
+    width:12px;
+    accessible-role:slider;
+    accessible-label:App.ru?"Прокрутка":"Scroll";
+    accessible-value:-root.value/1px;
+    accessible-value-minimum:0;
+    accessible-value-maximum:root.maximum/1px;
+    accessible-value-step:40;
+    accessible-action-set-value(v) => { if v.is-float() { root.value=-clamp(v.to-float()*1px,0px,root.maximum); } }
+    accessible-action-increment => { root.value=max(-root.maximum,root.value - 40px); }
+    accessible-action-decrement => { root.value=min(0px,root.value + 40px); }
+    property<length> thumb-height:min(root.height,max(32px,root.height*root.page-size/max(1px,root.maximum+root.page-size)));
+    property<length> travel:max(1px,root.height - root.thumb-height);
+    changed maximum => { root.value=clamp(root.value,-max(0px,root.maximum),0px); }
+    key-pressed(e) => {
+        if e.text==Key.DownArrow { root.value=max(-root.maximum,root.value - 40px); return accept; }
+        if e.text==Key.UpArrow { root.value=min(0px,root.value + 40px); return accept; }
+        if e.text==Key.PageDown { root.value=max(-root.maximum,root.value - root.page-size); return accept; }
+        if e.text==Key.PageUp { root.value=min(0px,root.value + root.page-size); return accept; }
+        if e.text==Key.Home { root.value=0px; return accept; }
+        if e.text==Key.End { root.value=-root.maximum; return accept; }
+        return reject;
+    }
+    thumb := Rectangle {
+        x:(parent.width - self.width)/2;
+        y:root.travel*clamp(-root.value/max(1px,root.maximum),0,1);
+        width:touch.has-hover || touch.pressed || root.has-focus ? 6px : 4px;
+        height:root.thumb-height; border-radius:3px;
+        background:touch.pressed || root.has-focus ? Theme.accent : touch.has-hover ? #a0e8f099 : #a0e8f04d;
+        animate width, background { duration:Theme.control; easing:ease-out; }
+    }
+    touch := TouchArea {
+        property<length> start-y;
+        property<length> start-value;
+        property<length> start-maximum;
+        mouse-cursor:pointer;
+        pointer-event(e) => {
+            if e.kind==PointerEventKind.down && e.button==PointerEventButton.left {
+                root.focus();
+                if self.mouse-y<thumb.y || self.mouse-y>thumb.y+thumb.height {
+                    root.value=-root.maximum*clamp((self.mouse-y - thumb.height/2)/root.travel,0,1);
+                }
+                self.start-y=self.mouse-y; self.start-value=root.value; self.start-maximum=root.maximum;
+            }
+        }
+        moved => {
+            if self.pressed {
+                if self.start-maximum!=root.maximum {
+                    self.start-y=self.mouse-y; self.start-value=root.value; self.start-maximum=root.maximum;
+                }
+                root.value=clamp(self.start-value - (self.mouse-y - self.start-y)*root.maximum/root.travel,-root.maximum,0px);
+            }
+        }
+        scroll-event(e) => { root.value=clamp(root.value+e.delta-y,-root.maximum,0px); return accept; }
+    }
+}
+
+export component ScrollView inherits Rectangle {
+    in property<bool> enabled:true;
+    in property<bool> reserve-scrollbar-space:false;
+    in property<ScrollBarPolicy> vertical-scrollbar-policy:as-needed;
+    in property<ScrollBarPolicy> horizontal-scrollbar-policy:always-off;
+    in property<bool> mouse-drag-pan-enabled:false;
+    out property<length> visible-width <=> flick.width;
+    out property<length> visible-height <=> flick.height;
+    in-out property<length> viewport-width <=> flick.viewport-width;
+    in-out property<length> viewport-height <=> flick.viewport-height;
+    in-out property<length> viewport-x <=> flick.viewport-x;
+    in-out property<length> viewport-y <=> flick.viewport-y;
+    callback scrolled;
+    background:transparent; clip:true;
+    flick := Flickable {
+        x:0px; y:0px;
+        width:parent.width - (root.reserve-scrollbar-space ? 12px : 0px);
+        height:parent.height;
+        interactive:root.mouse-drag-pan-enabled;
+        flicked => { root.scrolled(); }
+        @children
+    }
+    ScrollThumb {
+        x:parent.width - 12px; height:parent.height;
+        maximum:max(0px,flick.viewport-height - flick.height);
+        page-size:flick.height; value <=> flick.viewport-y;
+        visible:root.vertical-scrollbar-policy!=ScrollBarPolicy.always-off && self.maximum>0px;
+        enabled:root.enabled;
+    }
+}
+
+// Keeping repeated rows inside Flickable preserves Slint's list virtualization.
+export component ListView inherits ScrollView {
+    reserve-scrollbar-space:true;
+    accessible-role:list;
+    @children
+}

@@ -1,0 +1,24 @@
+import { Theme, Label } from "theme.slint";
+import { App } from "data.slint";
+
+export component TrafficChart inherits Rectangle {
+    background:transparent; clip:true;
+    property<int> revision:App.chart-revision;
+    property<duration> sample-start:0ms;
+    init => { root.sample-start=animation-tick(); }
+    changed revision => { root.sample-start=animation-tick(); }
+    property<float> progress:Theme.reduce-motion || App.status!=2 ? 1 : clamp((animation-tick() - root.sample-start)/1s,0,1);
+    Image {
+        // The curve texture is prepared off-thread at the window's DPI.
+        // Per-frame rendering is one translated image, without parsing paths.
+        x:-root.width/59*root.progress; y:0px;
+        width:root.width*60/59; height:root.height;
+        source:App.chart; image-fit:fill;
+    }
+    Label {
+        x:0px; y:0px; width:parent.width - 8px; height:18px;
+        text:(App.ru?"пик ":"peak ")+App.chart-peak;
+        horizontal-alignment:right; font-family:"JetBrains Mono";
+        font-size:10px; color:Theme.faint;
+    }
+}
