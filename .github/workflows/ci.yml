@@ -12,6 +12,8 @@ permissions:
 env:
   SING_BOX_VERSION: "1.13.14"
   SING_BOX_ARCHIVE_SHA256: "f580782c6dd10f7691c66cea1d7c421813c5fbf7e305d1ee7ce0c3a40d196341"
+  MIHOMO_VERSION: "1.19.33"
+  MIHOMO_ARCHIVE_SHA256: "6ab2180875f9f6fff8b19386d760daec257f66b45f72b3afc650634272fa837a"
 
 jobs:
   check:
@@ -43,6 +45,23 @@ jobs:
           New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
           Copy-Item -LiteralPath "$expanded/sing-box-$env:SING_BOX_VERSION-windows-amd64/sing-box.exe" -Destination "src-tauri/resources/sing-box.exe"
 
+      - name: Download verified Mihomo core
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP "mihomo.zip"
+          $url = "https://github.com/MetaCubeX/mihomo/releases/download/v$env:MIHOMO_VERSION/mihomo-windows-amd64-v$env:MIHOMO_VERSION.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $actual = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -ne $env:MIHOMO_ARCHIVE_SHA256) {
+            throw "Mihomo archive checksum mismatch: $actual"
+          }
+          $expanded = Join-Path $env:RUNNER_TEMP "mihomo"
+          Expand-Archive -LiteralPath $archive -DestinationPath $expanded
+          $core = Get-ChildItem -LiteralPath $expanded -Filter "mihomo.exe" -File -Recurse | Select-Object -First 1
+          if (-not $core) { throw "mihomo.exe not found in the verified archive" }
+          New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
+          Copy-Item -LiteralPath $core.FullName -Destination "src-tauri/resources/mihomo.exe"
+
       - run: cargo fmt --all -- --check
       - run: cargo test --workspace --locked
       - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
@@ -63,6 +82,7 @@ jobs:
             Write-Output $startupLog
             if ($app.HasExited -or $startupLog -match '(?m)^Umbra:') { throw "Native startup failed.`n$startupLog" }
             if (-not (Test-Path (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Bundled core was not discovered' }
+            if (-not (Test-Path (Join-Path $env:UMBRA_DATA_DIR 'bin/mihomo.exe'))) { throw 'Bundled Mihomo core was not discovered' }
           } finally {
             if (-not $app.HasExited) { Stop-Process -Id $app.Id; $null = $app.WaitForExit(10000) }
           }

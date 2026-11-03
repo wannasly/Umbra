@@ -11,10 +11,10 @@ try {
     if (-not (Test-Path -LiteralPath $installer)) { throw 'Installer missing' }
     $zip = [IO.Compression.ZipFile]::OpenRead($archive)
     try {
-        foreach ($name in @('Umbra.exe','resources/sing-box.exe','LICENSE.txt','THIRD_PARTY_NOTICES.md','licenses/Slint-Royalty-free-2.0.md','licenses/inter-OFL.txt','licenses/manrope-OFL.txt','licenses/jetbrainsmono-OFL.txt','licenses/Lucide-LICENSE.txt','licenses/flag-icons-LICENSE.txt','licenses/sing-box-GPL-3.0.txt')) {
+        foreach ($name in @('Umbra.exe','resources/sing-box.exe','resources/mihomo.exe','LICENSE.txt','THIRD_PARTY_NOTICES.md','licenses/Slint-Royalty-free-2.0.md','licenses/inter-OFL.txt','licenses/manrope-OFL.txt','licenses/jetbrainsmono-OFL.txt','licenses/Lucide-LICENSE.txt','licenses/flag-icons-LICENSE.txt','licenses/sing-box-GPL-3.0.txt','licenses/GPL-3.0.txt')) {
             if (-not $zip.GetEntry($name)) { throw "Portable archive is missing $name" }
         }
-        foreach ($pair in @(@('Umbra.exe','target/release/umbra.exe'),@('resources/sing-box.exe','src-tauri/resources/sing-box.exe'))) {
+        foreach ($pair in @(@('Umbra.exe','target/release/umbra.exe'),@('resources/sing-box.exe','src-tauri/resources/sing-box.exe'),@('resources/mihomo.exe','src-tauri/resources/mihomo.exe'))) {
             $stream = $zip.GetEntry($pair[0]).Open()
             $sha = [Security.Cryptography.SHA256]::Create()
             try { $actual = [BitConverter]::ToString($sha.ComputeHash($stream)).Replace('-','') }
@@ -36,7 +36,7 @@ try {
     $process = Start-Process -FilePath $installer -ArgumentList "/S /D=$installDir" -PassThru -WindowStyle Hidden
     $null = $process.Handle
     if (-not $process.WaitForExit(60000) -or $process.ExitCode -ne 0) { throw 'Silent installation failed.' }
-    foreach ($relative in @('Umbra.exe','resources/sing-box.exe','licenses/Slint-Royalty-free-2.0.md','Uninstall.exe')) {
+    foreach ($relative in @('Umbra.exe','resources/sing-box.exe','resources/mihomo.exe','licenses/Slint-Royalty-free-2.0.md','Uninstall.exe')) {
         if (-not (Test-Path -LiteralPath (Join-Path $installDir $relative))) { throw "Installed file missing: $relative" }
     }
     if ((Get-FileHash -LiteralPath (Join-Path $installDir 'Umbra.exe')).Hash -ne (Get-FileHash target/release/umbra.exe).Hash) { throw 'Installed application differs from the build.' }
@@ -52,7 +52,8 @@ try {
         Write-Output $startupLog
         if ($smokeProcess.HasExited) { throw "Installed application exited during startup.`n$startupLog" }
         if ($startupLog -match '(?m)^Umbra:') { throw "Installed application reported a startup error.`n$startupLog" }
-        if (-not (Test-Path -LiteralPath (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Installed application did not discover its bundled core.' }
+        if (-not (Test-Path -LiteralPath (Join-Path $env:UMBRA_DATA_DIR 'bin/sing-box.exe'))) { throw 'Installed application did not discover the bundled sing-box core.' }
+        if (-not (Test-Path -LiteralPath (Join-Path $env:UMBRA_DATA_DIR 'bin/mihomo.exe'))) { throw 'Installed application did not discover the bundled Mihomo core.' }
     } finally {
         if ($smokeProcess -and -not $smokeProcess.HasExited) { Stop-Process -Id $smokeProcess.Id; $null = $smokeProcess.WaitForExit(10000) }
         $env:UMBRA_DATA_DIR = $savedData

@@ -22,7 +22,7 @@ use crate::proxy::system_proxy;
 use crate::singbox::clash_api;
 use crate::singbox::config::GeneratedConfig;
 use crate::singbox::job;
-use crate::singbox::version::core_path;
+use crate::singbox::version::core_path_for;
 use crate::state::update_conn;
 
 #[cfg(windows)]
@@ -147,6 +147,9 @@ fn parse_log_line(line: &str) -> LogLine {
 }
 
 fn try_parse(line: &str) -> Option<LogLine> {
+    if let Some(parsed) = try_parse_mihomo(line) {
+        return Some(parsed);
+    }
     let mut parts = line.splitn(5, ' ');
     let offset = parts.next()?;
     let valid_offset = offset.len() == 5
@@ -165,6 +168,44 @@ fn try_parse(line: &str) -> Option<LogLine> {
     )
     .map(|dt| dt.timestamp_millis())
     .unwrap_or_else(|_| now_ms());
+    Some(LogLine { ts, level, message })
+}
+
+fn try_parse_mihomo(line: &str) -> Option<LogLine> {
+    if !line.starts_with("time=\"") && !line.contains("level=") {
+        return None;
+    }
+    let level = if let Some(idx) = line.find("level=") {
+        let after = &line[idx + 6..];
+        let end = after.find(' ').unwrap_or(after.len());
+        normalize_level(after[..end].trim_matches('"'))?
+    } else {
+        "info".to_string()
+    };
+    let message = if let Some(idx) = line.find("msg=\"") {
+        let after = &line[idx + 5..];
+        if let Some(end) = after.rfind('"') {
+            after[..end].to_string()
+        } else {
+            after.to_string()
+        }
+    } else if let Some(idx) = line.find("msg=") {
+        line[idx + 4..].to_string()
+    } else {
+        line.to_string()
+    };
+    let ts = if line.starts_with("time=\"") {
+        let after = &line[6..];
+        if let Some(end) = after.find('"') {
+            chrono::DateTime::parse_from_rfc3339(&after[..end])
+                .map(|dt| dt.timestamp_millis())
+                .unwrap_or_else(|_| now_ms())
+        } else {
+            now_ms()
+        }
+    } else {
+        now_ms()
+    };
     Some(LogLine { ts, level, message })
 }
 
@@ -277,9 +318,10 @@ pub async fn start(
     config: &GeneratedConfig,
     mode: Mode,
     mixed_port: u16,
+    core_engine: &str,
 ) -> AppResult<()> {
     let state = app.state();
-    let exe = core_path(&state.data_dir);
+    let exe = core_path_for(&state.data_dir, core_engine);
     if !exe.exists() {
         return Err(AppError::CoreNotInstalled);
     }
@@ -497,24 +539,36 @@ async fn check_config(
     work_dir: &Path,
 ) -> AppResult<()> {
     let mut cmd = Command::new(exe);
-    cmd.arg("check")
-        .arg("-c")
-        .arg(config_path)
-        .current_dir(work_dir)
-        .stdin(Stdio::null());
+    let is_mihomo = crate::singbox::version::is_mihomo(exe);
+    if is_mihomo {
+        cmd.arg("-t")
+            .arg("-f")
+            .arg(config_path)
+            .current_dir(work_dir)
+            .stdin(Stdio::null());
+    } else {
+        cmd.arg("check")
+            .arg("-c")
+            .arg(config_path)
+            .current_dir(work_dir)
+            .stdin(Stdio::null());
+    }
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let output = cmd
         .output()
         .await
-        .map_err(|e| AppError::CoreStartFailed(format!("could not run sing-box check: {e}")))?;
+        .map_err(|e| AppError::CoreStartFailed(format!("could not run core check: {e}")))?;
     if output.status.success() {
         return Ok(());
     }
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let detail = tail_str(stderr.trim(), 4000);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let combined = format!("{}\n{}", stderr, stdout);
+    let detail = tail_str(combined.trim(), 4000);
+    let core_name = if is_mihomo { "mihomo" } else { "sing-box" };
     for line in detail.lines().filter(|l| !l.trim().is_empty()) {
-        logs.push_now("error", format!("[sing-box check] {}", line.trim()));
+        logs.push_now("error", format!("[{} check] {}", core_name, line.trim()));
     }
     Err(AppError::CoreStartFailed(format!(
         "invalid config: {}",
@@ -524,22 +578,34 @@ async fn check_config(
 
 fn spawn_child(app: &AppHandle, ctx: &RunCtx) -> AppResult<Child> {
     let mut cmd = Command::new(&ctx.exe);
-    cmd.arg("run")
-        .arg("-c")
-        .arg(&ctx.config_path)
-        .arg("--disable-color")
-        .current_dir(&ctx.work_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        // Covers the graceful paths only; the job object below is what makes
-        // the core die when this process is terminated without unwinding.
-        .kill_on_drop(true);
+    if crate::singbox::version::is_mihomo(&ctx.exe) {
+        cmd.arg("-d")
+            .arg(&ctx.work_dir)
+            .arg("-f")
+            .arg(&ctx.config_path)
+            .current_dir(&ctx.work_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .kill_on_drop(true);
+    } else {
+        cmd.arg("run")
+            .arg("-c")
+            .arg(&ctx.config_path)
+            .arg("--disable-color")
+            .current_dir(&ctx.work_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            // Covers the graceful paths only; the job object below is what makes
+            // the core die when this process is terminated without unwinding.
+            .kill_on_drop(true);
+    }
     #[cfg(windows)]
     cmd.creation_flags(CREATE_NO_WINDOW);
     let mut child = cmd
         .spawn()
-        .map_err(|e| AppError::CoreStartFailed(format!("could not spawn sing-box: {e}")))?;
+        .map_err(|e| AppError::CoreStartFailed(format!("could not spawn core: {e}")))?;
     assign_to_job(app, &child);
     if let Some(stdout) = child.stdout.take() {
         tokio::spawn(read_pipe(app.clone(), stdout));

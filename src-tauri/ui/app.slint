@@ -202,11 +202,17 @@ export component MainWindow inherits Window {
                 Field {text<=>App.field0; multiline:true; placeholder:App.ru?"Вставьте ссылки VLESS, Hysteria2 или JSON":"Paste VLESS, Hysteria2 links or JSON"; }
                 Button {ghost:true; text:App.ru?"Из буфера обмена":"Paste from clipboard"; icon:@image-url("icons/clipboard.svg"); clicked=> { App.action("paste-import","",""); } }
             }
-            if root.displayed-modal==2 || root.displayed-modal==3: VerticalLayout { x:24px; y:72px; width:parent.width - 48px; height:140px; spacing:10px;
+            if root.displayed-modal==2: VerticalLayout { x:24px; y:72px; width:parent.width - 48px; height:140px; spacing:10px;
+                Label {text:App.ru?"Ссылка подписки":"Subscription URL"; }
+                HorizontalLayout {height:36px; spacing:8px;
+                    Field {text<=>App.field1; placeholder:"https://…"; horizontal-stretch:1; }
+                    Button {text:App.ru?"Вставить":"Paste"; icon:@image-url("icons/clipboard.svg"); clicked=> { App.action("paste-subscription","",""); } }
+                }
+                Label {height:42px; wrap:word-wrap; color:Theme.faint; text:App.ru?"Название и серверы загрузятся из подписки автоматически.":"The subscription name and servers will be loaded automatically."; }
+            }
+            if root.displayed-modal==3: VerticalLayout { x:24px; y:72px; width:parent.width - 48px; height:140px; spacing:10px;
                 Label {text:App.ru?"Название":"Name"; }
                 Field {text<=>App.field0; }
-                if root.displayed-modal==2: Label {text:App.ru?"Ссылка подписки":"Subscription URL"; }
-                if root.displayed-modal==2: Field {text<=>App.field1; placeholder:"https://…"; }
             }
             if root.displayed-modal==4: Label { x:24px; y:84px; width:parent.width - 48px; height:80px; wrap:word-wrap; text:App.ru?"Удалить выбранную запись? Это действие нельзя отменить.":"Delete the selected entry? This cannot be undone."; }
             if root.displayed-modal==6: Label { x:24px; y:84px; width:parent.width - 48px; height:80px; wrap:word-wrap; text:App.ru?"Для режима TUN нужно перезапустить Umbra с правами администратора.":"TUN mode requires restarting Umbra with administrator rights."; }

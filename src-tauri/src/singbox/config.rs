@@ -430,6 +430,364 @@ fn route(settings: &Settings) -> Value {
     Value::Object(route)
 }
 
+pub fn generate_for_core(
+    settings: &Settings,
+    servers: &[&ServerEntry],
+    selected_id: &str,
+    clash_port: u16,
+    clash_secret: &str,
+    is_mihomo: bool,
+) -> AppResult<GeneratedConfig> {
+    if is_mihomo {
+        generate_mihomo(settings, servers, selected_id, clash_port, clash_secret)
+    } else {
+        generate(settings, servers, selected_id, clash_port, clash_secret)
+    }
+}
+
+pub fn generate_mihomo(
+    settings: &Settings,
+    servers: &[&ServerEntry],
+    selected_id: &str,
+    clash_port: u16,
+    clash_secret: &str,
+) -> AppResult<GeneratedConfig> {
+    let tags = assign_tags(servers);
+    let tag_by_server_id: HashMap<String, String> = servers
+        .iter()
+        .zip(tags.iter())
+        .map(|(s, t)| (s.id.clone(), t.clone()))
+        .collect();
+    let selected_tag = servers
+        .iter()
+        .position(|s| s.id == selected_id)
+        .map(|i| tags[i].clone())
+        .ok_or_else(|| AppError::NotFound(format!("server {selected_id}")))?;
+
+    let mut proxies = Vec::with_capacity(servers.len());
+    for (server, tag) in servers.iter().zip(tags.iter()) {
+        proxies.push(server_proxy_mihomo(server, tag));
+    }
+
+    let mut selector_proxies = Vec::with_capacity(tags.len() + 1);
+    selector_proxies.push(json!(&selected_tag));
+    selector_proxies.push(json!("auto"));
+    for tag in &tags {
+        if tag != &selected_tag {
+            selector_proxies.push(json!(tag));
+        }
+    }
+
+    let proxy_groups = json!([
+        {
+            "name": "proxy",
+            "type": "select",
+            "proxies": selector_proxies
+        },
+        {
+            "name": "auto",
+            "type": "url-test",
+            "proxies": tags,
+            "url": settings.ping_url,
+            "interval": 300,
+            "tolerance": 50
+        }
+    ]);
+
+    let tun_enable = settings.mode == Mode::Tun;
+    let tun_stack = match settings.tun_stack.as_str() {
+        "system" => "system",
+        "gvisor" => "gvisor",
+        _ => "mixed",
+    };
+    let tun = json!({
+        "enable": tun_enable,
+        "stack": tun_stack,
+        "device": "umbra-tun",
+        "auto-route": true,
+        "auto-detect-interface": true,
+        "dns-hijack": ["tcp://any:53", "udp://any:53"],
+        "strict-route": settings.tun_strict_route
+    });
+
+    let dns = json!({
+        "enable": true,
+        "ipv6": false,
+        "enhanced-mode": "fake-ip",
+        "fake-ip-range": "198.18.0.1/16",
+        "nameserver": [
+            "https://1.1.1.1/dns-query",
+            "https://8.8.8.8/dns-query"
+        ],
+        "default-nameserver": [
+            "1.1.1.1",
+            "8.8.8.8"
+        ]
+    });
+
+    let rules = mihomo_rules(settings, servers);
+
+    let lower_log = settings.log_level.to_ascii_lowercase();
+    let log_level = match lower_log.as_str() {
+        "warn" => "warning",
+        "trace" => "debug",
+        other => other,
+    };
+
+    let json = json!({
+        "mode": "rule",
+        "log-level": log_level,
+        "external-controller": format!("127.0.0.1:{clash_port}"),
+        "secret": clash_secret,
+        "mixed-port": settings.mixed_port,
+        "ipv6": false,
+        "allow-lan": false,
+        "unified-delay": true,
+        "tcp-concurrent": true,
+        "find-process-mode": "always",
+        "tun": tun,
+        "dns": dns,
+        "proxies": proxies,
+        "proxy-groups": proxy_groups,
+        "rules": rules
+    });
+
+    Ok(GeneratedConfig {
+        json,
+        tag_by_server_id,
+        clash_port,
+        clash_secret: clash_secret.to_string(),
+    })
+}
+
+fn mihomo_rules(settings: &Settings, servers: &[&ServerEntry]) -> Vec<String> {
+    let mut rules = Vec::new();
+
+    // Prevent routing loop: server IPs must go to DIRECT
+    for server in servers {
+        let host = server.server.trim();
+        if let Ok(ip) = host.parse::<std::net::IpAddr>() {
+            match ip {
+                std::net::IpAddr::V4(v4) => {
+                    rules.push(format!("IP-CIDR,{v4}/32,DIRECT,no-resolve"));
+                }
+                std::net::IpAddr::V6(v6) => {
+                    rules.push(format!("IP-CIDR6,{v6}/128,DIRECT,no-resolve"));
+                }
+            }
+        }
+    }
+
+    if !settings.routing_rules.is_empty() {
+        for r in &settings.routing_rules {
+            if !r.enabled {
+                continue;
+            }
+            let val = r.value.trim();
+            if val.is_empty() {
+                continue;
+            }
+            let target = match r.action {
+                AppRouteAction::Proxy => "proxy",
+                AppRouteAction::Direct => "DIRECT",
+                AppRouteAction::Block => "REJECT",
+            };
+            match r.rule_type {
+                RuleType::Process => {
+                    let matcher = r.process_matcher.unwrap_or_else(|| {
+                        if val.contains('\\') || val.contains('/') {
+                            ProcessMatcher::Path
+                        } else {
+                            ProcessMatcher::Name
+                        }
+                    });
+                    match matcher {
+                        ProcessMatcher::Name => {
+                            rules.push(format!("PROCESS-NAME,{val},{target}"));
+                        }
+                        ProcessMatcher::Path => {
+                            rules.push(format!("PROCESS-PATH,{val},{target}"));
+                        }
+                    }
+                }
+                RuleType::Domain => {
+                    let matcher = r.domain_matcher.unwrap_or(DomainMatcher::Suffix);
+                    match matcher {
+                        DomainMatcher::Suffix => {
+                            let clean = val.trim_start_matches('*').trim_start_matches('.');
+                            if !clean.is_empty() {
+                                rules.push(format!("DOMAIN-SUFFIX,{clean},{target}"));
+                            }
+                        }
+                        DomainMatcher::Exact => {
+                            rules.push(format!("DOMAIN,{val},{target}"));
+                        }
+                        DomainMatcher::Keyword => {
+                            rules.push(format!("DOMAIN-KEYWORD,{val},{target}"));
+                        }
+                        DomainMatcher::Regex => {
+                            rules.push(format!("DOMAIN-REGEX,{val},{target}"));
+                        }
+                    }
+                }
+                RuleType::IpCidr => {
+                    rules.push(format!("IP-CIDR,{val},{target},no-resolve"));
+                }
+            }
+        }
+    } else {
+        for rule in &settings.app_routes {
+            let process_name = rule.process_name.trim();
+            if process_name.is_empty() {
+                continue;
+            }
+            let target = match rule.action {
+                AppRouteAction::Proxy => "proxy",
+                AppRouteAction::Direct => "DIRECT",
+                AppRouteAction::Block => "REJECT",
+            };
+            rules.push(format!("PROCESS-NAME,{process_name},{target}"));
+        }
+    }
+
+    if settings.discord_voice_direct {
+        rules.push("PROCESS-NAME,Discord.exe,DIRECT".into());
+        rules.push("PROCESS-NAME,DiscordCanary.exe,DIRECT".into());
+        rules.push("PROCESS-NAME,DiscordPTB.exe,DIRECT".into());
+    }
+
+    rules.push("GEOIP,private,DIRECT,no-resolve".into());
+
+    if settings.bypass_ru {
+        rules.push("GEOSITE,category-ru,DIRECT".into());
+        rules.push("GEOIP,RU,DIRECT,no-resolve".into());
+    }
+
+    let final_target = match settings.route_default {
+        RouteTarget::Proxy => "proxy",
+        RouteTarget::Direct => "DIRECT",
+    };
+    rules.push(format!("MATCH,{final_target}"));
+
+    rules
+}
+
+fn server_proxy_mihomo(s: &ProxyNode, tag: &str) -> Value {
+    match &s.kind {
+        ProxyKind::Vless(v) => vless_proxy_mihomo(s, v, tag),
+        ProxyKind::Hysteria2(h) => hysteria2_proxy_mihomo(s, h, tag),
+    }
+}
+
+fn vless_proxy_mihomo(s: &ProxyNode, v: &crate::models::VlessNode, tag: &str) -> Value {
+    let mut map = Map::new();
+    map.insert("name".into(), json!(tag));
+    map.insert("type".into(), json!("vless"));
+    map.insert("server".into(), json!(s.server));
+    map.insert("port".into(), json!(s.port));
+    map.insert("uuid".into(), json!(v.uuid));
+    map.insert("udp".into(), json!(true));
+
+    if !v.flow.is_empty() {
+        map.insert("flow".into(), json!(v.flow));
+    }
+
+    if v.security != Security::None {
+        map.insert("tls".into(), json!(true));
+        if !v.sni.is_empty() {
+            map.insert("servername".into(), json!(v.sni));
+        }
+        map.insert("skip-cert-verify".into(), json!(v.insecure));
+
+        let fingerprint = if v.fingerprint.is_empty() {
+            "chrome"
+        } else {
+            v.fingerprint.as_str()
+        };
+        map.insert("client-fingerprint".into(), json!(fingerprint));
+
+        if !v.alpn.is_empty() {
+            map.insert("alpn".into(), json!(v.alpn));
+        }
+
+        if v.security == Security::Reality {
+            map.insert(
+                "reality-opts".into(),
+                json!({
+                    "public-key": v.public_key,
+                    "short-id": v.short_id
+                }),
+            );
+        }
+    }
+
+    match &v.transport {
+        Transport::Tcp => {
+            map.insert("network".into(), json!("tcp"));
+        }
+        Transport::Ws { path, host } => {
+            map.insert("network".into(), json!("ws"));
+            let mut ws_opts = Map::new();
+            ws_opts.insert("path".into(), json!(path));
+            if !host.is_empty() {
+                ws_opts.insert("headers".into(), json!({ "Host": host }));
+            }
+            map.insert("ws-opts".into(), Value::Object(ws_opts));
+        }
+        Transport::Grpc { service_name } => {
+            map.insert("network".into(), json!("grpc"));
+            map.insert(
+                "grpc-opts".into(),
+                json!({
+                    "grpc-service-name": service_name
+                }),
+            );
+        }
+        Transport::Httpupgrade { path, host } => {
+            map.insert("network".into(), json!("http"));
+            let mut http_opts = Map::new();
+            http_opts.insert("path".into(), json!([path]));
+            if !host.is_empty() {
+                http_opts.insert("headers".into(), json!({ "Host": [host] }));
+            }
+            map.insert("http-opts".into(), Value::Object(http_opts));
+        }
+    }
+
+    Value::Object(map)
+}
+
+fn hysteria2_proxy_mihomo(s: &ProxyNode, h: &crate::models::Hysteria2Node, tag: &str) -> Value {
+    let mut map = Map::new();
+    map.insert("name".into(), json!(tag));
+    map.insert("type".into(), json!("hysteria2"));
+    map.insert("server".into(), json!(s.server));
+    map.insert("port".into(), json!(s.port));
+    map.insert("password".into(), json!(h.password));
+    map.insert("skip-cert-verify".into(), json!(h.insecure));
+
+    if !h.sni.is_empty() {
+        map.insert("sni".into(), json!(h.sni));
+    } else {
+        map.insert("sni".into(), json!(s.server));
+    }
+
+    if !h.alpn.is_empty() {
+        map.insert("alpn".into(), json!(h.alpn));
+    }
+
+    if let Some(obfs) = &h.obfs {
+        match obfs {
+            crate::models::Hysteria2Obfs::Salamander { password } => {
+                map.insert("obfs".into(), json!("salamander"));
+                map.insert("obfs-password".into(), json!(password));
+            }
+        }
+    }
+
+    Value::Object(map)
+}
+
 #[cfg(test)]
 #[allow(clippy::field_reassign_with_default)] // Keep scenario setup in the original configuration tests readable.
 mod tests {
@@ -1175,5 +1533,128 @@ mod tests {
                 String::from_utf8_lossy(&out.stderr)
             );
         }
+    }
+
+    #[test]
+    fn test_mihomo_generate_vless_reality() {
+        let mut node = entry("v1", "Canvas Reality");
+        node.server = "198.51.100.1".into();
+        node.port = 443;
+        node.kind = ProxyKind::Vless(crate::models::VlessNode {
+            uuid: "00000000-0000-0000-0000-000000000000".into(),
+            flow: "xtls-rprx-vision".into(),
+            security: Security::Reality,
+            sni: "yahoo.com".into(),
+            fingerprint: "chrome".into(),
+            public_key: "6q_4y9k9d2A4hH1cM_zS1x-yL9G5oJ8kX_1a2b3c4d4".into(),
+            short_id: "12345678".into(),
+            insecure: false,
+            alpn: vec!["h2".into(), "http/1.1".into()],
+            transport: Transport::Tcp,
+        });
+
+        let refs = [&node];
+        let cfg = generate_mihomo(&Settings::default(), &refs, "v1", 9090, "secret")
+            .expect("generate_mihomo");
+
+        assert_eq!(cfg.json["mode"], "rule");
+        assert_eq!(cfg.json["external-controller"], "127.0.0.1:9090");
+        assert_eq!(cfg.json["secret"], "secret");
+
+        let proxies = cfg.json["proxies"].as_array().expect("proxies array");
+        assert_eq!(proxies.len(), 1);
+        let p = &proxies[0];
+        assert_eq!(p["type"], "vless");
+        assert_eq!(p["flow"], "xtls-rprx-vision");
+        assert_eq!(p["client-fingerprint"], "chrome");
+        assert_eq!(
+            p["reality-opts"]["public-key"],
+            "6q_4y9k9d2A4hH1cM_zS1x-yL9G5oJ8kX_1a2b3c4d4"
+        );
+        assert_eq!(p["reality-opts"]["short-id"], "12345678");
+
+        let rules = cfg.json["rules"].as_array().expect("rules array");
+        assert!(rules
+            .iter()
+            .any(|r| r == "IP-CIDR,198.51.100.1/32,DIRECT,no-resolve"));
+        assert!(rules.iter().any(|r| r == "MATCH,proxy"));
+    }
+
+    #[test]
+    fn test_mihomo_generate_hysteria2() {
+        let mut node = entry("h1", "Hy2 Node");
+        node.server = "198.51.100.2".into();
+        node.port = 443;
+        node.kind = ProxyKind::Hysteria2(crate::models::Hysteria2Node {
+            password: "supersecretpassword".into(),
+            sni: "my-sni.com".into(),
+            insecure: true,
+            alpn: vec!["h3".into()],
+            obfs: Some(crate::models::Hysteria2Obfs::Salamander {
+                password: "salamanderpass".into(),
+            }),
+        });
+
+        let refs = [&node];
+        let cfg = generate_mihomo(&Settings::default(), &refs, "h1", 9090, "secret")
+            .expect("generate_mihomo");
+
+        let proxies = cfg.json["proxies"].as_array().expect("proxies array");
+        assert_eq!(proxies.len(), 1);
+        let p = &proxies[0];
+        assert_eq!(p["type"], "hysteria2");
+        assert_eq!(p["password"], "supersecretpassword");
+        assert_eq!(p["obfs"], "salamander");
+        assert_eq!(p["obfs-password"], "salamanderpass");
+        assert_eq!(p["skip-cert-verify"], true);
+    }
+
+    #[test]
+    fn test_mihomo_check_binary() {
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let mihomo_exe = manifest_dir.join("resources").join("mihomo.exe");
+        if !mihomo_exe.exists() {
+            return;
+        }
+
+        let mut node = entry("v1", "Canvas Reality");
+        node.server = "198.51.100.1".into();
+        node.port = 443;
+        node.kind = ProxyKind::Vless(crate::models::VlessNode {
+            uuid: "00000000-0000-0000-0000-000000000000".into(),
+            flow: "xtls-rprx-vision".into(),
+            security: Security::Reality,
+            sni: "yahoo.com".into(),
+            fingerprint: "chrome".into(),
+            public_key: "6q_4y9k9d2A4hH1cM_zS1x-yL9G5oJ8kX_1a2b3c4d4".into(),
+            short_id: "12345678".into(),
+            insecure: false,
+            alpn: vec!["h2".into(), "http/1.1".into()],
+            transport: Transport::Tcp,
+        });
+
+        let refs = [&node];
+        let cfg = generate_mihomo(&Settings::default(), &refs, "v1", 9090, "secret")
+            .expect("generate_mihomo");
+
+        let tmp = tempfile::NamedTempFile::new().expect("temp file");
+        std::fs::write(
+            tmp.path(),
+            serde_json::to_vec_pretty(&cfg.json).expect("json"),
+        )
+        .expect("write");
+
+        let output = std::process::Command::new(&mihomo_exe)
+            .arg("-t")
+            .arg("-f")
+            .arg(tmp.path())
+            .output()
+            .expect("run mihomo -t -f");
+
+        assert!(
+            output.status.success(),
+            "mihomo check failed: stderr={}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }

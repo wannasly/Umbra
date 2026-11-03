@@ -339,6 +339,10 @@ impl ProfileStore {
 // Settings
 // ---------------------------------------------------------------------------
 
+fn default_core_engine() -> String {
+    "mihomo".into()
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProxyBackup {
@@ -378,6 +382,9 @@ pub struct Settings {
     pub language: String,
     pub accent: String,
     pub mode: Mode,
+    /// Core selected for the next connection: `mihomo` or `sing-box`.
+    #[serde(default = "default_core_engine")]
+    pub core_engine: String,
     pub mixed_port: u16,
     pub selected_server_id: Option<String>,
     pub autostart: bool,
@@ -430,6 +437,7 @@ impl Default for Settings {
             language: "ru".into(),
             accent: "violet".into(),
             mode: Mode::SystemProxy,
+            core_engine: default_core_engine(),
             mixed_port: 2080,
             selected_server_id: None,
             autostart: false,
@@ -462,6 +470,9 @@ impl Default for Settings {
 
 impl Settings {
     pub fn normalize(&mut self) {
+        if !matches!(self.core_engine.as_str(), "mihomo" | "sing-box") {
+            self.core_engine = default_core_engine();
+        }
         if self.routing_rules.is_empty() && !self.app_routes.is_empty() {
             self.routing_rules = self
                 .app_routes
@@ -498,6 +509,8 @@ impl<'de> Deserialize<'de> for Settings {
             language: String,
             accent: String,
             mode: Mode,
+            #[serde(default = "default_core_engine")]
+            core_engine: String,
             mixed_port: u16,
             selected_server_id: Option<String>,
             autostart: bool,
@@ -534,6 +547,7 @@ impl<'de> Deserialize<'de> for Settings {
                     language: s.language,
                     accent: s.accent,
                     mode: s.mode,
+                    core_engine: s.core_engine,
                     mixed_port: s.mixed_port,
                     selected_server_id: s.selected_server_id,
                     autostart: s.autostart,
@@ -570,6 +584,7 @@ impl<'de> Deserialize<'de> for Settings {
             language: raw.language,
             accent: raw.accent,
             mode: raw.mode,
+            core_engine: raw.core_engine,
             mixed_port: raw.mixed_port,
             selected_server_id: raw.selected_server_id,
             autostart: raw.autostart,
@@ -609,9 +624,14 @@ impl<'de> Deserialize<'de> for Settings {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoreStatus {
+    pub engine: String,
     pub installed: bool,
     pub version: Option<String>,
     pub path: String,
+    pub mihomo_installed: bool,
+    pub mihomo_version: Option<String>,
+    pub sing_box_installed: bool,
+    pub sing_box_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

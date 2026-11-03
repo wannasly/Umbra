@@ -42,7 +42,9 @@ fn random_secret() -> String {
 
 pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<ConnectionState> {
     let state = app.state();
-    version::ensure_compatible_core(&version::core_path(&state.data_dir))?;
+    let settings = { state.settings.read().await.clone() };
+    let core = version::core_path_for(&state.data_dir, &settings.core_engine);
+    version::ensure_compatible_core(&core)?;
     let servers: Vec<ServerEntry> =
         { state.profiles.read().await.all_servers().cloned().collect() };
     // Snapshotted here and carried in the connection state for the whole
@@ -53,7 +55,6 @@ pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<
         .find(|s| s.id == server_id)
         .map(|s| s.name.clone())
         .ok_or_else(|| AppError::NotFound(format!("server {server_id}")))?;
-    let settings = { state.settings.read().await.clone() };
     if settings.mode == Mode::Tun && !elevation::is_elevated() {
         return Err(AppError::NeedsElevation);
     }
@@ -78,8 +79,18 @@ pub(crate) async fn do_connect(app: &AppHandle, server_id: String) -> AppResult<
         let clash_port = pick_free_port(CLASH_PORT_START, Some(settings.mixed_port)).await?;
         let secret = random_secret();
         let refs: Vec<&ServerEntry> = servers.iter().collect();
-        let generated = config::generate(&settings, &refs, &server_id, clash_port, &secret)?;
-        process::start(app, &generated, settings.mode, settings.mixed_port).await?;
+        let is_mihomo = version::is_mihomo(&core);
+        let generated = config::generate_for_core(
+            &settings, &refs, &server_id, clash_port, &secret, is_mihomo,
+        )?;
+        process::start(
+            app,
+            &generated,
+            settings.mode,
+            settings.mixed_port,
+            &settings.core_engine,
+        )
+        .await?;
         if settings.mode == Mode::SystemProxy {
             if let Err(e) = system_proxy::enable_proxy(state, settings.mixed_port).await {
                 process::stop(app).await;

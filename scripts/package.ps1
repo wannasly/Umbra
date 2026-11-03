@@ -12,7 +12,12 @@ try {
     $stagingDir = Join-Path ([IO.Path]::GetTempPath()) ('Umbra-package-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path (Join-Path $stagingDir 'resources') -Force | Out-Null
     Copy-Item -LiteralPath 'target/release/umbra.exe' -Destination (Join-Path $stagingDir 'Umbra.exe')
-    Copy-Item -LiteralPath 'src-tauri/resources/sing-box.exe' -Destination (Join-Path $stagingDir 'resources/sing-box.exe')
+    if (Test-Path -LiteralPath 'src-tauri/resources/mihomo.exe') {
+        Copy-Item -LiteralPath 'src-tauri/resources/mihomo.exe' -Destination (Join-Path $stagingDir 'resources/mihomo.exe')
+    }
+    if (Test-Path -LiteralPath 'src-tauri/resources/sing-box.exe') {
+        Copy-Item -LiteralPath 'src-tauri/resources/sing-box.exe' -Destination (Join-Path $stagingDir 'resources/sing-box.exe')
+    }
     Copy-Item -LiteralPath 'LICENSE' -Destination (Join-Path $stagingDir 'LICENSE.txt')
     Copy-Item -LiteralPath 'THIRD_PARTY_NOTICES.md' -Destination $stagingDir
     Copy-Item -LiteralPath 'licenses' -Destination $stagingDir -Recurse

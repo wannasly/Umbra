@@ -34,6 +34,7 @@ generated.json
 *.sln
 *.sw?
 
-# bundled sing-box core (fetched at build time, 44MB)
+# Bundled proxy cores (fetched and checksum-verified by CI)
 src-tauri/resources/sing-box.exe
+src-tauri/resources/mihomo.exe
 /artifacts/

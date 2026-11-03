@@ -11,11 +11,14 @@ use tokio::io::AsyncWriteExt;
 use crate::error::{AppError, AppResult};
 use crate::events::{DownloadPhase, DownloadProgress, EV_DOWNLOAD_PROGRESS};
 use crate::models::UpdateCheck;
-use crate::singbox::version::{core_path, probe_version};
+use crate::singbox::version::{core_path_for, probe_version};
 use crate::state::AppState;
 
 const API_RELEASES: &str = "https://api.github.com/repos/SagerNet/sing-box/releases?per_page=30";
 const API_TAG: &str = "https://api.github.com/repos/SagerNet/sing-box/releases/tags";
+const MIHOMO_API_RELEASES: &str =
+    "https://api.github.com/repos/MetaCubeX/mihomo/releases?per_page=30";
+const MIHOMO_API_TAG: &str = "https://api.github.com/repos/MetaCubeX/mihomo/releases/tags";
 const PROGRESS_STEP: u64 = 256 * 1024;
 
 /// Resolved release: what to download and how to verify it.
@@ -54,6 +57,21 @@ fn asset_version(name: &str) -> Option<&str> {
     for _ in 0..3 {
         let p = parts.next()?;
         if p.is_empty() || !p.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+    }
+    parts.next().is_none().then_some(v)
+}
+
+/// `mihomo-windows-amd64-vX.Y.Z.zip` -> `X.Y.Z`; excludes compatible/alpha builds.
+fn mihomo_asset_version(name: &str) -> Option<&str> {
+    let v = name
+        .strip_prefix("mihomo-windows-amd64-v")?
+        .strip_suffix(".zip")?;
+    let mut parts = v.split('.');
+    for _ in 0..3 {
+        let part = parts.next()?;
+        if part.is_empty() || !part.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
     }
@@ -99,7 +117,7 @@ fn gh_client() -> AppResult<reqwest::Client> {
 async fn fetch_release(client: &reqwest::Client, tag: Option<&str>) -> AppResult<ReleaseInfo> {
     if let Some(t) = tag {
         let clean_v = t.trim().trim_start_matches('v');
-        if !crate::singbox::version::is_version_compatible(clean_v) {
+        if !crate::singbox::version::is_sing_box_version_compatible(clean_v) {
             return Err(AppError::Unsupported(format!(
                 "version '{t}' is incompatible with Umbra (requires sing-box 1.13.x)"
             )));
@@ -156,7 +174,7 @@ async fn fetch_release(client: &reqwest::Client, tag: Option<&str>) -> AppResult
             .iter()
             .find_map(|a| asset_version(&a.name).map(|v| (v.to_string(), a)))
         {
-            if crate::singbox::version::is_version_compatible(&version) {
+            if crate::singbox::version::is_sing_box_version_compatible(&version) {
                 return Ok(ReleaseInfo {
                     version,
                     url: asset.browser_download_url.clone(),
@@ -171,6 +189,56 @@ async fn fetch_release(client: &reqwest::Client, tag: Option<&str>) -> AppResult
     ))
 }
 
+async fn fetch_mihomo_release(
+    client: &reqwest::Client,
+    tag: Option<&str>,
+) -> AppResult<ReleaseInfo> {
+    let url = match tag {
+        Some(tag) => format!("{MIHOMO_API_TAG}/{tag}"),
+        None => MIHOMO_API_RELEASES.to_string(),
+    };
+    let resp = client
+        .get(&url)
+        .timeout(Duration::from_secs(20))
+        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await?;
+    let status = resp.status();
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err(AppError::NotFound("Mihomo release".into()));
+    }
+    if !status.is_success() {
+        return Err(AppError::Network(format!(
+            "GitHub API returned HTTP {status}"
+        )));
+    }
+    let releases: Vec<GhRelease> = if tag.is_some() {
+        vec![resp.json().await?]
+    } else {
+        resp.json().await?
+    };
+    for release in releases {
+        if let Some((version, asset)) = release
+            .assets
+            .iter()
+            .find_map(|asset| mihomo_asset_version(&asset.name).map(|v| (v, asset)))
+        {
+            if crate::singbox::version::is_mihomo_version_compatible(version) {
+                return Ok(ReleaseInfo {
+                    version: version.into(),
+                    url: asset.browser_download_url.clone(),
+                    size: asset.size,
+                    sha256: asset.digest.as_deref().and_then(digest_to_hex),
+                });
+            }
+        }
+    }
+    Err(AppError::NotFound(
+        "no compatible Mihomo Windows amd64 release found".into(),
+    ))
+}
+
 /// Latest release, cached for the session (unauthenticated limit: 60 req/h).
 async fn latest_release(state: &AppState) -> AppResult<ReleaseInfo> {
     {
@@ -181,6 +249,18 @@ async fn latest_release(state: &AppState) -> AppResult<ReleaseInfo> {
     }
     let info = fetch_release(&gh_client()?, None).await?;
     *state.release_cache.lock().await = Some(info.clone());
+    Ok(info)
+}
+
+async fn latest_mihomo_release(state: &AppState) -> AppResult<ReleaseInfo> {
+    {
+        let cache = state.mihomo_release_cache.lock().await;
+        if let Some(info) = cache.as_ref() {
+            return Ok(info.clone());
+        }
+    }
+    let info = fetch_mihomo_release(&gh_client()?, None).await?;
+    *state.mihomo_release_cache.lock().await = Some(info.clone());
     Ok(info)
 }
 
@@ -203,8 +283,13 @@ fn emit_progress(
 }
 
 pub async fn check_core_update(state: &AppState) -> AppResult<UpdateCheck> {
-    let latest = latest_release(state).await?;
-    let current = probe_version(core_path(&state.data_dir)).await?;
+    let engine = state.settings.read().await.core_engine.clone();
+    let latest = if engine == "sing-box" {
+        latest_release(state).await?
+    } else {
+        latest_mihomo_release(state).await?
+    };
+    let current = probe_version(core_path_for(&state.data_dir, &engine)).await?;
     let available = update_available(current.as_deref(), &latest.version);
     Ok(UpdateCheck {
         current,
@@ -219,6 +304,10 @@ pub async fn download_core(
     version: Option<String>,
 ) -> AppResult<()> {
     let client = gh_client()?;
+    let settings = state.settings.read().await;
+    let engine = settings.core_engine.clone();
+    let mirror = settings.github_mirror.clone();
+    drop(settings);
     let info = match version.as_deref().map(str::trim).filter(|v| !v.is_empty()) {
         Some(v) => {
             let tag = if v.starts_with('v') {
@@ -226,20 +315,37 @@ pub async fn download_core(
             } else {
                 format!("v{v}")
             };
-            fetch_release(&client, Some(&tag)).await?
+            if engine == "sing-box" {
+                fetch_release(&client, Some(&tag)).await?
+            } else {
+                fetch_mihomo_release(&client, Some(&tag)).await?
+            }
         }
-        None => latest_release(state).await?,
+        None => {
+            if engine == "sing-box" {
+                latest_release(state).await?
+            } else {
+                latest_mihomo_release(state).await?
+            }
+        }
     };
 
-    let mirror = state.settings.read().await.github_mirror.clone();
     let url = apply_mirror(&mirror, &info.url);
 
     let bin_dir = state.data_dir.join("bin");
     tokio::fs::create_dir_all(&bin_dir).await?;
     let tmp = bin_dir.join("download.tmp");
-    let target = core_path(&state.data_dir);
+    let core_name = if engine == "sing-box" {
+        "sing-box.exe"
+    } else {
+        "mihomo.exe"
+    };
+    let target = core_path_for(&state.data_dir, &engine);
 
-    let result = download_and_install(&app, &client, &url, &info, &bin_dir, &tmp, target).await;
+    let result = download_and_install(
+        &app, &client, &url, &info, &bin_dir, &tmp, target, core_name,
+    )
+    .await;
     if result.is_err() {
         let _ = tokio::fs::remove_file(&tmp).await;
     }
@@ -255,6 +361,7 @@ async fn download_and_install(
     bin_dir: &Path,
     tmp: &Path,
     target: PathBuf,
+    core_name: &'static str,
 ) -> AppResult<()> {
     let resp = client.get(url).send().await?;
     let status = resp.status();
@@ -301,29 +408,33 @@ async fn download_and_install(
     emit_progress(app, DownloadPhase::Extract, downloaded, total);
 
     let tmp_owned = tmp.to_path_buf();
-    tokio::task::spawn_blocking(move || extract_core(&tmp_owned, &target))
+    let core_name_owned = core_name.to_string();
+    tokio::task::spawn_blocking(move || extract_core(&tmp_owned, &target, &core_name_owned))
         .await
         .map_err(|e| AppError::Internal(format!("extract task failed: {e}")))??;
 
-    tokio::fs::write(bin_dir.join("version.txt"), &info.version).await?;
+    let version_file = format!("{}-version.txt", core_name.trim_end_matches(".exe"));
+    tokio::fs::write(bin_dir.join(version_file), &info.version).await?;
     let _ = tokio::fs::remove_file(tmp).await;
     emit_progress(app, DownloadPhase::Done, downloaded, total);
     Ok(())
 }
 
-fn is_core_entry(name: &str) -> bool {
-    name == "sing-box.exe" || name.ends_with("/sing-box.exe") || name.ends_with("\\sing-box.exe")
+fn is_core_entry(name: &str, core_name: &str) -> bool {
+    name == core_name
+        || name.ends_with(&format!("/{core_name}"))
+        || name.ends_with(&format!("\\{core_name}"))
 }
 
-fn extract_core(zip_path: &Path, target: &Path) -> AppResult<()> {
+fn extract_core(zip_path: &Path, target: &Path, core_name: &str) -> AppResult<()> {
     let file = std::fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| AppError::Internal(format!("bad zip archive: {e}")))?;
     let entry_name = archive
         .file_names()
-        .find(|n| is_core_entry(n))
+        .find(|n| is_core_entry(n, core_name))
         .map(str::to_string)
-        .ok_or_else(|| AppError::Internal("sing-box.exe not found in the archive".into()))?;
+        .ok_or_else(|| AppError::Internal(format!("{core_name} not found in the archive")))?;
     let mut entry = archive
         .by_name(&entry_name)
         .map_err(|e| AppError::Internal(format!("bad zip entry: {e}")))?;
@@ -352,7 +463,11 @@ fn stage_and_swap(entry: &mut impl std::io::Read, staged: &Path, target: &Path) 
         // Windows can't replace a running exe; surface a clear message.
         std::fs::remove_file(target).map_err(|e| {
             AppError::Internal(format!(
-                "cannot replace sing-box.exe — stop the running core and retry ({e})"
+                "cannot replace {} — stop the running core and retry ({e})",
+                target
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("core.exe")
             ))
         })?;
     }
@@ -426,11 +541,17 @@ mod tests {
 
     #[test]
     fn core_entry_names() {
-        assert!(is_core_entry("sing-box.exe"));
-        assert!(is_core_entry("sing-box-1.11.9-windows-amd64/sing-box.exe"));
-        assert!(is_core_entry("sing-box-1.11.9-windows-amd64\\sing-box.exe"));
-        assert!(!is_core_entry("bin/sing-box.exe.sig"));
-        assert!(!is_core_entry("LICENSE"));
+        assert!(is_core_entry("sing-box.exe", "sing-box.exe"));
+        assert!(is_core_entry(
+            "sing-box-1.11.9-windows-amd64/sing-box.exe",
+            "sing-box.exe"
+        ));
+        assert!(is_core_entry(
+            "sing-box-1.11.9-windows-amd64\\sing-box.exe",
+            "sing-box.exe"
+        ));
+        assert!(!is_core_entry("bin/sing-box.exe.sig", "sing-box.exe"));
+        assert!(!is_core_entry("LICENSE", "sing-box.exe"));
     }
 
     #[test]
@@ -452,9 +573,9 @@ mod tests {
             w.finish().unwrap();
         }
         let target = dir.join("sing-box.exe");
-        extract_core(&zip_path, &target).unwrap();
+        extract_core(&zip_path, &target, "sing-box.exe").unwrap();
         assert_eq!(std::fs::read(&target).unwrap(), b"exe-bytes");
-        extract_core(&zip_path, &target).unwrap(); // replace path
+        extract_core(&zip_path, &target, "sing-box.exe").unwrap(); // replace path
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -472,7 +593,7 @@ mod tests {
             w.write_all(b"mit").unwrap();
             w.finish().unwrap();
         }
-        let err = extract_core(&zip_path, &dir.join("sing-box.exe")).unwrap_err();
+        let err = extract_core(&zip_path, &dir.join("sing-box.exe"), "sing-box.exe").unwrap_err();
         assert_eq!(err.code(), "INTERNAL");
         std::fs::remove_dir_all(&dir).unwrap();
     }
@@ -496,7 +617,7 @@ mod tests {
         let target = dir.join("sing-box.exe");
         std::fs::write(&target, b"working-core").unwrap();
 
-        assert!(extract_core(&zip_path, &target).is_err());
+        assert!(extract_core(&zip_path, &target, "sing-box.exe").is_err());
         assert_eq!(std::fs::read(&target).unwrap(), b"working-core");
         assert!(!dir.join("sing-box.exe.new").exists());
         std::fs::remove_dir_all(&dir).unwrap();
@@ -520,7 +641,7 @@ mod tests {
         let target = dir.join("sing-box.exe");
         std::fs::write(&target, b"stale").unwrap();
 
-        extract_core(&zip_path, &target).unwrap();
+        extract_core(&zip_path, &target, "sing-box.exe").unwrap();
         assert_eq!(std::fs::read(&target).unwrap(), b"fresh");
         assert!(!dir.join("sing-box.exe.new").exists());
         std::fs::remove_dir_all(&dir).unwrap();

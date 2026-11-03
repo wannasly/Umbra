@@ -9,6 +9,17 @@
 
 The Rust dependency versions are recorded in `Cargo.lock`; dependency copyright and license files are collected in `licenses/Rust-dependencies.txt`. Native UI source is in `src-tauri/ui` and the backend remains in `src-tauri/src`.
 
+## Mihomo
+
+Готовые сборки Umbra содержат неизменённый исполняемый файл Mihomo 1.19.33.
+
+- Project: https://github.com/MetaCubeX/mihomo
+- License: GNU General Public License v3.0
+- License text: https://github.com/MetaCubeX/mihomo/blob/Meta/LICENSE
+- Full GPLv3 text: `licenses/GPL-3.0.txt`
+
+Mihomo является отдельным процессом и не входит в исходный код Umbra. Все права на Mihomo принадлежат его авторам и участникам проекта.
+
 ## sing-box
 
 Готовые сборки Umbra содержат неизменённый исполняемый файл sing-box.

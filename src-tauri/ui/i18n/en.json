@@ -322,7 +322,9 @@
       "userAgentNote": "Panels serve different formats depending on the User-Agent. Changing it can help when a panel refuses to serve the list."
     },
     "core": {
-      "title": "sing-box core",
+      "title": "Proxy core",
+      "engine": "Select core",
+      "engineHint": "Used for System Proxy and TUN. The selected core takes effect on the next connection.",
       "installed": "Installed",
       "notInstalled": "Not installed",
       "latest": "Latest",

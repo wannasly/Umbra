@@ -16,8 +16,9 @@ pub struct AppState {
     pub conn: RwLock<ConnectionState>,
     /// %APPDATA%\com.umbra.proxy
     pub data_dir: PathBuf,
-    /// Session cache of the latest sing-box release (GitHub unauthenticated: 60 req/h).
+    /// Session caches of latest release metadata (GitHub unauthenticated: 60 req/h).
     pub release_cache: Mutex<Option<ReleaseInfo>>,
+    pub mihomo_release_cache: Mutex<Option<ReleaseInfo>>,
     /// Running sing-box core, if any.
     pub core: Mutex<Option<CoreHandle>>,
     /// Ring buffer of recent core log lines (cap 2000).
@@ -38,6 +39,7 @@ impl AppState {
             conn: RwLock::new(ConnectionState::disconnected(mode)),
             data_dir,
             release_cache: Mutex::new(None),
+            mihomo_release_cache: Mutex::new(None),
             core: Mutex::new(None),
             logs: LogBuffer::new(),
             conn_ops: Mutex::new(()),

@@ -348,7 +348,12 @@ impl UiState {
                 EV_DOWNLOAD_PROGRESS => self.message(
                     ui,
                     format!(
-                        "sing-box: {} / {}",
+                        "{}: {} / {}",
+                        if self.settings.core_engine == "sing-box" {
+                            "sing-box"
+                        } else {
+                            "Mihomo"
+                        },
                         format_bytes(
                             value["downloaded"].as_f64().unwrap_or(0.0),
                             self.settings.language == "ru",
@@ -1086,6 +1091,12 @@ impl UiState {
                     .map_err(|e| AppError::Internal(e.to_string()))?;
                 data.set_field0(text(value));
             }
+            "paste-subscription" => {
+                let value = arboard::Clipboard::new()
+                    .and_then(|mut c| c.get_text())
+                    .map_err(|e| AppError::Internal(e.to_string()))?;
+                data.set_field1(text(value.trim()));
+            }
             "sub-dialog" => {
                 data.set_field0("".into());
                 data.set_field1("".into());
@@ -1258,11 +1269,15 @@ impl UiState {
                     "language" => vec!["ru", "en"],
                     "accent" => vec!["violet", "cyan", "emerald", "amber"],
                     "ipStrategy" => vec!["ipv4_only", "prefer_ipv4", "prefer_ipv6", "ipv6_only"],
+                    "coreEngine" => vec!["mihomo", "sing-box"],
                     "logLevel" => vec!["trace", "debug", "info", "warn", "error", "fatal"],
                     "tunStack" => vec!["mixed", "system", "gvisor"],
                     _ => vec![],
                 };
                 if let Some(value) = values.get(index) {
+                    if id == "coreEngine" {
+                        self.core_update = None;
+                    }
                     self.patch(ui, id, json!(value));
                 }
             }
@@ -1318,14 +1333,26 @@ impl UiState {
                 let id = data.get_modal_id().to_string();
                 match data.get_modal() {
                     1 => self.submit(ui, Task::Import(data.get_field0().to_string()), true),
-                    2 => self.submit(
-                        ui,
-                        Task::AddSub(
-                            data.get_field1().trim().into(),
-                            data.get_field0().to_string(),
-                        ),
-                        true,
-                    ),
+                    2 => {
+                        let url = data.get_field1().trim().to_string();
+                        let valid_url = ::url::Url::parse(&url).is_ok_and(|parsed| {
+                            matches!(parsed.scheme(), "http" | "https")
+                                && parsed.host_str().is_some()
+                        });
+                        if !valid_url {
+                            self.message(
+                                ui,
+                                tr(
+                                    ru,
+                                    "Вставьте полную HTTP или HTTPS ссылку подписки",
+                                    "Paste a full HTTP or HTTPS subscription URL",
+                                ),
+                                true,
+                            );
+                            return Ok(());
+                        }
+                        self.submit(ui, Task::AddSub(url, String::new()), true);
+                    }
                     3 => self.submit(ui, Task::RenameSub(id, data.get_field0().to_string()), true),
                     4 => self.submit(
                         ui,
@@ -1877,22 +1904,65 @@ fn settings_rows(
     agent.description = label("subscriptions.userAgentNote");
     rows.push(agent);
     rows.push(section("core.title"));
+    let mihomo_installed = core.is_some_and(|c| c.mihomo_installed);
+    let sing_box_installed = core.is_some_and(|c| c.sing_box_installed);
+    let mihomo_version = core
+        .and_then(|c| c.mihomo_version.as_deref())
+        .unwrap_or(if mihomo_installed { "—" } else { "" });
+    let sing_box_version = core
+        .and_then(|c| c.sing_box_version.as_deref())
+        .unwrap_or(if sing_box_installed { "—" } else { "" });
+    let core_name = if s.core_engine == "sing-box" {
+        "sing-box"
+    } else {
+        "Mihomo"
+    };
+    let selected_installed = if s.core_engine == "sing-box" {
+        sing_box_installed
+    } else {
+        mihomo_installed
+    };
+    let selected_version = if s.core_engine == "sing-box" {
+        sing_box_version
+    } else {
+        mihomo_version
+    };
     rows.push(SettingRow {
         label: label("core.installed"),
         kind: 6,
-        value: core
-            .and_then(|c| c.version.as_deref())
-            .map(text)
-            .unwrap_or_else(|| label("core.notInstalled")),
+        value: text(if selected_installed {
+            format!("{core_name} {selected_version}")
+        } else {
+            format!("{core_name} · {}", label("core.notInstalled"))
+        }),
         ..Default::default()
     });
+    let mut engine = choice(
+        "coreEngine",
+        "core.engine",
+        vec![
+            text(if mihomo_installed {
+                format!("Mihomo · {mihomo_version}")
+            } else {
+                "Mihomo · —".into()
+            }),
+            text(if sing_box_installed {
+                format!("sing-box · {sing_box_version}")
+            } else {
+                "sing-box · —".into()
+            }),
+        ],
+        usize::from(s.core_engine == "sing-box"),
+    );
+    engine.description = label("core.engineHint");
+    rows.push(engine);
     let latest = update.map(|u| u.latest.as_str()).unwrap_or("—");
     rows.push(button(
         "update",
         "core.latest",
         text(format!("{latest} · {}", label("core.check"))),
     ));
-    if core.is_some_and(|c| !c.installed) || update.is_some_and(|u| u.update_available) {
+    if !selected_installed || update.is_some_and(|u| u.update_available) {
         rows.push(button("download", "core.download", label("core.download")));
     }
     rows.push(button("data", "core.openFolder", label("core.openFolder")));
