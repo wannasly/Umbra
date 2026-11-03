@@ -76,8 +76,8 @@ jobs:
           }
           $expanded = Join-Path $env:RUNNER_TEMP "mihomo"
           Expand-Archive -LiteralPath $archive -DestinationPath $expanded
-          $core = Get-ChildItem -LiteralPath $expanded -Filter "mihomo.exe" -File -Recurse | Select-Object -First 1
-          if (-not $core) { throw "mihomo.exe not found in the verified archive" }
+          $core = Get-ChildItem -LiteralPath $expanded -Filter "mihomo-windows-amd64.exe" -File -Recurse | Select-Object -First 1
+          if (-not $core) { throw "mihomo-windows-amd64.exe not found in the verified archive" }
           New-Item -ItemType Directory -Force -Path "src-tauri/resources" | Out-Null
           Copy-Item -LiteralPath $core.FullName -Destination "src-tauri/resources/mihomo.exe"
 
