@@ -194,8 +194,7 @@ fn try_parse_mihomo(line: &str) -> Option<LogLine> {
     } else {
         line.to_string()
     };
-    let ts = if line.starts_with("time=\"") {
-        let after = &line[6..];
+    let ts = if let Some(after) = line.strip_prefix("time=\"") {
         if let Some(end) = after.find('"') {
             chrono::DateTime::parse_from_rfc3339(&after[..end])
                 .map(|dt| dt.timestamp_millis())
