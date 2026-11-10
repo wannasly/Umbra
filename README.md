@@ -1,80 +1,37 @@
-<div align="center">
-<img src="src-tauri/icons/icon.png" width="112" alt="Umbra">
-<h1>Umbra</h1>
-<p>Нативный Windows-клиент для Mihomo и sing-box: Rust + Slint, без WebView2.</p>
-</div>
+# Umbra
 
-## Возможности
+**Native Windows networking client built with Rust and Slint.** Umbra manages Mihomo and sing-box, with subscription import, system proxy and TUN modes, and rules for routing by process, domain, or IP/CIDR.
 
-- VLESS, TLS/Reality, Hysteria2; импорт ссылок и конфигураций.
-- Переключение между Mihomo и sing-box для системного прокси и TUN.
-- Подписки: обновление по расписанию, квоты, HWID, кабинет и поддержка провайдера.
-- Системный прокси с восстановлением прежних настроек после отключения или сбоя.
-- TUN; маршруты процессов, доменов и IP/CIDR; действия Proxy / Direct / Block.
-- Избранное, поиск, сортировка, задержка, статистика и журнал.
-- Трей, повторный запуск, автозапуск, русский и английский интерфейс.
+[Download for Windows](https://github.com/wannasly/Umbra/releases/latest) · [CI](https://github.com/wannasly/Umbra/actions/workflows/ci.yml) · [Документация на русском](README.ru.md)
 
-Дизайн перенесён из исходной Umbra: палитра, Inter / Manrope / JetBrains Mono, круг подключения, панели и расположение элементов. Профили и настройки прежней версии используются из %APPDATA%/com.umbra.proxy.
+![Umbra dashboard showing the active server, connection controls, and traffic chart](docs/images/native-dashboard.png)
 
-![Главный экран Umbra](docs/images/native-dashboard.png)
+## Install and connect
 
-## Скачать
+1. Download the x64 installer or portable ZIP for Windows 10 or 11. The release bundles both cores and includes `SHA256SUMS.txt`. The builds are unsigned.
+2. Import a provider subscription or a supported server link, then select a server. VLESS, Reality, and Hysteria2 support depends on the selected core and configuration. sing-box does not support xHTTP.
+3. Select the core in Settings and connect in system proxy or TUN mode. TUN requires administrator privileges.
+4. Use the [routing screen](docs/images/native/routing-1280x720.png) to add Proxy, Direct, or Block rules. Reconnect to apply changes to an active connection.
 
-Откройте [релизы](https://github.com/wannasly/Umbra/releases):
+Quit Umbra from the tray before updating. Profiles are retained under `%APPDATA%/com.umbra.proxy`.
 
-- Umbra_&lt;version&gt;_x64-setup.exe — установщик для текущего пользователя.
-- Umbra_&lt;version&gt;_windows_x64_portable.zip — приложение и ядро без установки.
-- SHA256SUMS.txt — контрольные суммы файлов.
+## Engineering notes
 
-Требуется Windows 10/11 x64. WebView2 и Node.js для запуска не нужны. В выпуск входят Mihomo и sing-box; ядро выбирается в настройках и применяется при следующем подключении. Если выбранного ядра нет, Umbra скачает его с официального GitHub-релиза с проверкой SHA-256, когда релиз предоставляет контрольную сумму. Для TUN нужны права администратора. При обновлении завершите Umbra через меню трея. Установщик и удаление приложения сохраняют пользовательские профили.
+- **Native UI.** Slint replaced the Tauri/React frontend while retaining the Rust backend and existing profile format. FemtoVG handles rendering on compatible drivers, with a software fallback for basic Windows drivers. See the [migration notes and measurement setup (Russian)](docs/NATIVE_UI.ru.md).
+- **Core lifecycle.** The Rust backend prepares configuration, launches the selected core, and manages Windows proxy state. It restores the previous system proxy settings on disconnect and supports recovery after a crash.
+- **Packaging.** CI verifies checksums for pinned core archives. The release workflow builds and smoke-tests the installer and portable bundle. See [release notes for v0.3.2](docs/RELEASE_v0.3.2.md).
 
-Сборки не подписаны коммерческим сертификатом. SHA-256 проверяет целостность файла, но не заменяет цифровую подпись.
+## Build and test
 
-## Быстрый старт
+Use Rust stable with the Windows MSVC toolchain, Visual Studio Build Tools, and the Windows SDK. Place the desired core executable in `src-tauri/resources/` before building a bundled executable. The directory name dates to the original Tauri app. The native build uses Cargo directly.
 
-1. Добавьте подписку провайдера или импортируйте ссылки VLESS / Hysteria2.
-2. Выберите узел на странице «Серверы».
-3. Выберите системный прокси или TUN и нажмите кнопку подключения.
-4. Добавьте правила в разделе «Маршрутизация». После изменения правил активного соединения выполните переподключение.
-
-xHTTP не поддерживается sing-box; такие узлы пропускаются с сообщением об ошибке импорта.
-
-## Ресурсы
-
-Локальный замер 23.10.2026: release-сборки, окно 1280×720 логических пикселей, отключённое соединение, одинаковые тестовые профили, 30 секунд после прогрева. У Tauri учтено всё дерево процессов WebView2. CPU — процент всей машины с 16 логическими процессорами.
-
-Slint в этом замере использует FemtoVG. На базовом видеодрайвере без нужной поддержки OpenGL приложение автоматически выбирает программный рендер; его расход может отличаться.
-
-| Метрика в простое | Tauri + React 0.2.5 | Rust + Slint |
-| --- | ---: | ---: |
-| Приватный рабочий набор RAM | 205,44 МиБ | 63,80 МиБ |
-| Общий рабочий набор процессов | 485,31 МиБ | 114,85 МиБ |
-| CPU | 10,427% | 0,009% |
-| Загрузка GPU, сумма движков | 2,59% | 0% в выборке |
-| Видеопамять, dedicated + shared | 72,29 МиБ | 81,86 МиБ |
-
-Приватная RAM в этом сценарии ниже примерно на 69%. Видеопамяти Slint потребляет немного больше. Это измерение одного компьютера и сценария, а не гарантия для любых систем. При подключении расход ядра sing-box учитывается отдельно. [Архитектура и методика](docs/NATIVE_UI.ru.md).
-
-В простое UI не запрашивает непрерывные кадры. Фон и декоративная волна статичны; переходы элементов управления сохранены. Списки виртуализированы, журнал ограничен 2000 строками, фоновые события объединяются перед обновлением UI.
-
-## Сборка
-
-Нужны Rust stable, MSVC Build Tools и Windows SDK. Для установщика дополнительно нужен NSIS. Положите официальные mihomo.exe и/или sing-box.exe в src-tauri/resources/ либо используйте GitHub Actions: он скачивает закреплённые версии обоих ядер и проверяет SHA-256 архивов.
-
-~~~powershell
+```powershell
+cargo fmt --all -- --check
 cargo test --workspace --locked
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo build --release --locked
-./scripts/package.ps1
-~~~
+```
 
-Приложение появится в target/release/umbra.exe, установщик и portable-архив — в release/. При другом расположении NSIS передайте параметр -MakeNsis с путём к makensis.exe.
+Run `target/release/umbra.exe`. To build an installer and portable archive, install NSIS, place both cores in `src-tauri/resources/`, and run `./scripts/package.ps1`. See the [testing guide (Russian)](docs/TESTING.ru.md) for runtime, visual, and packaging checks.
 
-Release workflow собирает Windows-приложение и установщик в GitHub Actions и прикладывает файлы с контрольными суммами к тегу v*. npm и Tauri CLI для новой сборки не используются. Историческое имя каталога src-tauri сохранено для переноса бэкенда.
-
-[Инструкция тестирования](docs/TESTING.ru.md). Исходная Tauri-версия сохранена в истории и [теге v0.2.5](https://github.com/wannasly/Umbra/tree/v0.2.5).
-
-## Приватность и лицензии
-
-Umbra не использует аналитику, рекламу или телеметрию. Данные остаются локальными; подписка обновляется через указанный URL провайдера. HWID передаётся только при включённой настройке. [Приватность](docs/PRIVACY.ru.md), [безопасность](SECURITY.md).
-
-Код Umbra — [MIT](LICENSE). Для Slint, шрифтов, иконок, флагов и отдельного sing-box действуют собственные лицензии: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md), каталог licenses/.
+[MIT license](LICENSE) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Security reporting](SECURITY.md) · [Privacy notes (Russian)](docs/PRIVACY.ru.md)
